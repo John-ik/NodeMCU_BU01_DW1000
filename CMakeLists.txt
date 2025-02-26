@@ -34,8 +34,15 @@ enable_language(C ASM)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
+
+FILE(GLOB LIBS_INC "libs/*/include")
+FILE(GLOB LIBS_SRC "libs/*/src/*.c")
+
+include_directories(${LIBS_INC})
+
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME} ${LIBS_SRC})
+
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
