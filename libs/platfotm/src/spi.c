@@ -1,4 +1,4 @@
-#include "dw_1000.h"
+#include "port.h"
 #include "main.h"
 
 #include "string.h"
@@ -18,9 +18,9 @@ void dw_deactivate(){
   HAL_GPIO_WritePin(DW_CS_Port, DW_CS_Pin, 1);
 }
 
-void DW_spi_write (
-    uint16_t headerLength, const uint8_t *headerBuffer, 
-    uint32_t bodylength, const uint8_t *bodyBuffer
+int writetospi (
+    uint16 headerLength, const uint8 *headerBuffer, 
+    uint32 bodylength, const uint8 *bodyBuffer
 ){
   dw_activate();
   
@@ -29,14 +29,17 @@ void DW_spi_write (
 
   size_t buf_length = headerLength + bodylength; 
 
-  HAL_SPI_Transmit(&DW_SPI, spi_buf_tx, buf_length, DW_SPI_TIMEOUT);
+  if (HAL_SPI_Transmit(&DW_SPI, spi_buf_tx, buf_length, DW_SPI_TIMEOUT) != HAL_OK)
+    return DWT_ERROR;
 
   dw_deactivate();
+
+  return DWT_SUCCESS;
 }
 
-void DW_spi_read (
-  uint16_t headerLength, const uint8_t *headerBuffer, 
-  uint32_t bodylength, uint8_t *bodyBuffer
+int readfromspi (
+  uint16 headerLength, const uint8 *headerBuffer, 
+  uint32 bodylength, uint8 *bodyBuffer
 ){
   dw_activate();
   
@@ -44,9 +47,12 @@ void DW_spi_read (
   memset(spi_buf_rx, 0, sizeof(spi_buf_rx));
 
 
-  HAL_SPI_TransmitReceive(&DW_SPI, spi_buf_tx, spi_buf_rx, headerLength + bodylength, DW_SPI_TIMEOUT);
+  if (HAL_SPI_TransmitReceive(&DW_SPI, spi_buf_tx, spi_buf_rx, headerLength + bodylength, DW_SPI_TIMEOUT) != HAL_OK)
+    return DWT_ERROR;
  
   memcpy(bodyBuffer, spi_buf_rx + headerLength, bodylength);
 
   dw_deactivate();
+
+  return DWT_SUCCESS;
 }

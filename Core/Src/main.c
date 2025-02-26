@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "dw_1000.h"
+#include "deca_device_api.h"
 #include "string.h"
 #include "stdio.h"
 
@@ -95,17 +95,13 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  DEBUG_transmit_str("");
+  
+  
+  if (dwt_initialise(DWT_LOADNONE) == -1){
+    DEBUG_transmit_str("ERRORO");
+  }
 
-  uint8_t header = 0x00;
-  uint32_t spi_buf_rx;
-
-  DEBUG_transmit_str("before read");
-  DW_spi_read(1, &header, 4, &spi_buf_rx);
-  DEBUG_transmit_str("after read");
-
-  sprintf((char*) uart_buf, "0x%lX\n", spi_buf_rx);
-  HAL_UART_Transmit(&huart1, uart_buf, strlen((char*) uart_buf), 100);
+  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
 
   /* USER CODE END 2 */
 
