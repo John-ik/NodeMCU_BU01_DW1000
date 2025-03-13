@@ -26,3 +26,8 @@
 // -------------------- PLATFORM SPECIFIC API --------------------
 
 ITStatus EXTI_GetITEnStatus(uint32_t EXTI_Line);
+
+
+void led_signal (uint8_t signal);
+
+void reset_DW1000(void);

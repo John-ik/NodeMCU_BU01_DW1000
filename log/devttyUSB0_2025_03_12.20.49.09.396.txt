@@ -1,0 +1,70 @@
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
+/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:542 : REG 0x10 = 0xFFFFFFFF
+/home/johnik/Д��кументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:543 : -1
+
+/home/johnik/До��ументы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:551 : rx_buffer = 0xFFFF0000FFFFFFFFFFFF0000
+
