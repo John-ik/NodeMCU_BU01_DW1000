@@ -26,8 +26,10 @@
 /* USER CODE BEGIN Includes */
 #include "deca_device_api.h"
 #include "deca_regs.h"
+#include "deca_sleep.h"
 
 #include "mac.h"
+#include "deca_leds.h"
 
 #include "port.h"
 
@@ -46,10 +48,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
-//#define TX_ANT_DLY 16436
-//#define RX_ANT_DLY 16436
-#define TX_ANT_DLY 0
-#define RX_ANT_DLY 32950
+#define TX_ANT_DLY 16436
+#define RX_ANT_DLY 16436
+// #define TX_ANT_DLY 0
+// #define RX_ANT_DLY 32950
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +62,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t uart_buf[128]; 
+char uart_buf[128]; 
 
 static dwt_config_t config =
 {
@@ -77,14 +79,14 @@ static dwt_config_t config =
 };
 
 /* Frames used in the ranging process. See NOTE 2 below. */
-static uint8 rx_poll_msg[] =  {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x21, 0, 0};
-static uint8 tx_resp_msg[] =  {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 distance_msg[] = {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0xAA, 0, 0,0, 0, 0};
-static uint8 tx_poll_msg[] =  {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x21, 0, 0};
-static uint8 rx_resp_msg[] =  {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
-static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 angle_msg[] =    {0x41, 0x88, 0, 0xFF, 0xFF, 0xFF, 0xFF, 'V', 'E', 0xFE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 rx_poll_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x21, 0, 0};
+static uint8 tx_resp_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
+static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 distance_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0xAA, 0, 0,0, 0, 0};
+static uint8 tx_poll_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x21, 0, 0};
+static uint8 rx_resp_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'W', 'A', 0x10, 0x02, 0, 0, 0, 0};
+static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 angle_msg[] =    {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'V', 'E', 0xFE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 Semaphore_Release[] =    {0x41, 0x88, 0, 0x0, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 Tag_Statistics[] =                      {0x41, 0x88, 0, 0x0, 0xDE, 'W', 'A', 'V', 'E', 0xE1, 0, 0, 0};
 static uint8 Master_Release_Semaphore[] =            {0x41, 0x88, 0, 0x0, 0xDE, 'W', 'A', 'V', 'E', 0xE2, 0, 0, 0};
@@ -134,7 +136,7 @@ static uint32 status_reg = 0;
 
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-#define POLL_TX_TO_RESP_RX_DLY_UUS 150
+#define POLL_TX_TO_RESP_RX_DLY_UUS 50
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 2800 //2700 will fail
@@ -164,6 +166,7 @@ static double tof;
 static double distance;
 static double final_distance;
 
+static size_t debug_counter;
 
 // #define TAG
 #define TAG_ID 0x0F
@@ -195,7 +198,7 @@ void Tag_Measure_Dis(void)
     {
         DEBUG_transmit_str("PULL");
         dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-        dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+        dwt_setrxtimeout(UINT16_MAX);
         /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
         tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         tx_poll_msg[ALL_MSG_TAG_IDX] = TAG_ID;                  //��վ�յ���ǩ����Ϣ��������TAG_ID,�ڻ�վ�ظ���ǩ��ʱ��Ҳ��Ҫָ��TAG_ID,ֻ��TAG_IDһ�²�������
@@ -204,24 +207,20 @@ void Tag_Measure_Dis(void)
         dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
 
         /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
-         * set by dwt_setrxaftertxdelay() has elapsed. */
+        * set by dwt_setrxaftertxdelay() has elapsed. */
+        led_signal(1); debug_counter = 1;
         dwt_starttx(DWT_START_TX_IMMEDIATE| DWT_RESPONSE_EXPECTED);
 
-        
-        // dwt_rxenable(0); Response already expected in inittial TX
-
-        led_signal(1);
-        DEBUG_transmit_fmt("tx_poll_msg = 0x%X%X%X\n", 
-          (tx_poll_msg[0] << 24) | (tx_poll_msg[1] << 16) |(tx_poll_msg[2] << 8) |(tx_poll_msg[3]),
-          (tx_poll_msg[4] << 24) | (tx_poll_msg[5] << 16) |(tx_poll_msg[6] << 8) |(tx_poll_msg[7]),
-          (tx_poll_msg[8] << 24) | (tx_poll_msg[9] << 16) |(tx_poll_msg[10] << 8) |(tx_poll_msg[11])
-        );
+        debug_counter = 2;
+        // dwt_rxenable(0);// Response already expected in inittial TX
+        // led_signal(2);
         /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 8 below. */
         while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
         { };
-
+        debug_counter = status_reg;
         if (status_reg & SYS_STATUS_RXFCG)
         {
+            led_signal(2); debug_counter = 20;
 					  /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
@@ -241,7 +240,7 @@ void Tag_Measure_Dis(void)
 
             if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
             {
-                DEBUG_transmit_str("RESPONSE");
+                debug_counter = 30;
                 uint32 final_tx_time;
 
                 /* Retrieve poll transmission and response reception timestamp. */
@@ -271,8 +270,8 @@ void Tag_Measure_Dis(void)
                 //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS*2);
                 dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED );
 
-                DEBUG_transmit_str("FINALED");
-                led_signal(2);
+                // DEBUG_transmit_str("FINALED");
+                // led_signal(2);
 
                 while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
                 { };
@@ -456,7 +455,7 @@ int main(void)
   uint8 anthor_index = 0;
   uint8 tag_index = 0;
 
-  int8 frame_len = 0;
+  uint8 frame_len = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -503,11 +502,27 @@ int main(void)
 
   int rx_ant_delay =32880;
   int index = 0 ;
-  
-  // Confifure filtering
-  dwt_enableframefilter(DWT_FF_DATA_EN);
+
+  // set TX/RX leds
+  {
+    dwt_on_deboundsclock();
+    dwt_blinking_enable();
+    dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
+    dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
+    dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
+    deca_sleep(10);
+    // blink all leds
+    dwt_blink_leds();
+  }
 
   #ifdef ANTHOR
+  // Confifure filtering
+  // dwt_enableframefilter(DWT_FF_DATA_EN);
+  uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
+  DEBUG_transmit_fmt("0x%X", cfg);
+
+  dwt_write32bitoffsetreg(DIG_DIAG_ID, 0, EVC_EN);
+
   /* USER CODE END 2 */
   
   /* Infinite loop */
@@ -523,36 +538,30 @@ int main(void)
     dwt_rxenable(0);
 
     led_signal(0);
-    DEBUG_transmit_str("WAIT");
+    DEBUG_transmit_fmt("WAIT FFRc = %d; Debug = %ld\n", dwt_read16bitoffsetreg(DIG_DIAG_ID, EVC_FFR_OFFSET), debug_counter);
+    debug_counter = 0;
     /* Poll for reception of a frame or error/timeout. See NOTE 7 below. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
     { };
     
-    
-    if (status_reg & SYS_STATUS_ALL_RX_GOOD)
+    // DEBUG_transmit_fmt("Status = 0x%lX", status_reg);
+    debug_counter = 1;
+    // if (status_reg == SYS_STATUS_ALL_RX_GOOD)
+    if (status_reg & SYS_STATUS_RXFCG)
     {
-      led_signal(1);
-      DEBUG_transmit_str("SUCCES GET 1");
+      led_signal(1); debug_counter = 20;
         /* Clear good RX frame event in the DW1000 status register. */
-         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
          
          /* A frame has been received, read it into the local buffer. */
-         frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-         DEBUG_transmit_fmt("REG 0x10 = 0x%X", dwt_read32bitreg(RX_FINFO_ID));
-         DEBUG_transmit_fmt("%d\n", frame_len);
+      frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
         if (frame_len <= RX_BUF_LEN)
-        {
-            dwt_readrxdata(rx_buffer, frame_len, 0);
-        }
+      {
+          dwt_readrxdata(rx_buffer, frame_len, 0);
+      }
         /* Check that the frame is a poll sent by "DS TWR initiator" example.
          * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-
-         DEBUG_transmit_fmt("rx_buffer = 0x%X%X%X\n", 
-          (rx_buffer[0] << 24) | (rx_buffer[1] << 16) |(rx_buffer[2] << 8) |(rx_buffer[3]),
-          (rx_buffer[4] << 24) | (rx_buffer[5] << 16) |(rx_buffer[6] << 8) |(rx_buffer[7]),
-          (rx_buffer[8] << 24) | (rx_buffer[9] << 16) 
-        );
 
         anthor_index = rx_buffer[ALL_MSG_SN_IDX]%ANCHOR_MAX_NUM;
         if(anthor_index != ANCHOR_IND)
@@ -562,30 +571,33 @@ int main(void)
 
         rx_buffer[ALL_MSG_SN_IDX] = 0;
         rx_buffer[ALL_MSG_TAG_IDX] = 0;
-
+        debug_counter = 29;
         if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
-            
+        {            
+            debug_counter = 30;
             /* Retrieve poll reception timestamp. */
-            poll_rx_ts = get_rx_timestamp_u64();           
-
+            poll_rx_ts = get_rx_timestamp_u64();
+            // DEBUG_transmit_fmt("poll_rx_ts = %d", poll_rx_ts);
             /* Set expected delay and timeout for final message reception. */
             dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-            dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+            dwt_setrxtimeout(UINT16_MAX);
 
             /* Write and send the response message. See NOTE 9 below.*/
             tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
             tx_resp_msg[ALL_MSG_TAG_IDX] = tag_index;
             dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
             dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
-            dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+            int err = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     
-            led_signal(2);
+            led_signal(2); debug_counter = 31;
             while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
             { };
-
-            if (status_reg & SYS_STATUS_ALL_RX_GOOD)
+            // DEBUG_transmit_fmt("err = %d\nstatus = 0x%lX", err, status_reg);
+            
+            debug_counter = status_reg | 3;
+            if (status_reg & SYS_STATUS_RXFCG)
             {
+              led_signal(3); debug_counter = 40;
                 /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
@@ -679,9 +691,10 @@ int main(void)
   #ifdef TAG
 
   while (1){
+    debug_counter = 0;
     Tag_Measure_Dis();//measuer distance between tag and all anthor
     led_signal(0);
-    DEBUG_transmit_fmt("DIST: %3.2f m\n", final_distance);
+    DEBUG_transmit_fmt("DIST: %3.2f m DEBUG = %ld\n", final_distance, debug_counter);
     HAL_Delay(500);
   }
 

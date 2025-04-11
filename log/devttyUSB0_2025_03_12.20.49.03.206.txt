@@ -1,2 +1,0 @@
-/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:526 : WAIT
-/home/johnik/Документы/ГУАП/Раб/NodeMCU_BU01_DW1000/Core/Src/main.c:535 : SUCCES GET 1
