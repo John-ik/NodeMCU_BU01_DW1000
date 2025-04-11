@@ -1,0 +1,18 @@
+@startuml state
+
+[*] --> Reset
+Reset : Ожидание
+
+Reset --> Pull
+Pull: Отправка Pull
+
+Pull --> Final : Response
+Pull --> Reset
+Final : отправка Final
+
+Final --> Distance : Distance
+Final --> Reset
+
+Distance --> Reset
+
+@enduml
