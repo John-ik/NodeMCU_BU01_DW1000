@@ -153,8 +153,8 @@ void showMsg(char* str, MacMessage msg){
         case MSG_PULL_ONE:
             break;
         case MSG_RESP_ONE:
-            sprintf(data_buf,   "\tpull_rx_ts = %d\n"
-                                "\tresp_tx_ts = %d",
+            sprintf(data_buf,   "\tpull_rx_ts = %u\n"
+                                "\tresp_tx_ts = %u",
                 msg.data.resp_one.pull_rx_ts, msg.data.resp_one.resp_tx_ts);
             break;
         default:
