@@ -541,7 +541,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   reset_DW1000();
   
-  while (dwt_initialise(DWT_LOADNONE) == -1){
+  while (dwt_initialise(DWT_LOADUCODE) == -1){
     DEBUG_transmit_str("ERRORO");
     reset_DW1000();
   }
