@@ -13,6 +13,36 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
 
+# COMPILE_ID
+# increment on each build
+set(COMPILE_ID_FILE "${CMAKE_CURRENT_SOURCE_DIR}/compile_id.txt")
+
+if(NOT EXISTS ${COMPILE_ID_FILE})
+    file(WRITE ${COMPILE_ID_FILE} "1\n")
+endif()
+
+# Function to read the current version from the file
+function(read_id)
+    file(READ ${COMPILE_ID_FILE} CURRENT_COMPILE_ID)
+    string(STRIP ${CURRENT_COMPILE_ID} CURRENT_COMPILE_ID)  # Remove any whitespace
+    set(COMPILE_ID ${CURRENT_COMPILE_ID} PARENT_SCOPE)
+endfunction()
+
+# Function to increment the version number
+function(increment_version)
+    read_id()
+    math(EXPR NEW_COMPILE_ID "${COMPILE_ID} + 1")
+    file(WRITE ${COMPILE_ID_FILE} "${NEW_COMPILE_ID}\n")  # Write the new version back to the file
+    set(COMPILE_ID ${NEW_COMPILE_ID} PARENT_SCOPE)
+endfunction()
+
+# Increment the version number on each build
+increment_version()
+
+# Print the current version
+message(STATUS "Current compile_id: ${COMPILE_ID}")
+add_definitions(-DCOMPILE_ID=${COMPILE_ID})
+
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")

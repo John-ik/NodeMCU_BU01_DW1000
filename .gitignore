@@ -3,3 +3,5 @@ build
 CMakeFiles
 firmware.bin
 log/
+libs/decadriver/docs
+compile_id.txt
