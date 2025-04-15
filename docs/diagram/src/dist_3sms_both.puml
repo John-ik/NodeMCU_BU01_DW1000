@@ -1,0 +1,8 @@
+@startuml dist_3sms_both
+
+Tag -> Anchor: Pull
+Anchor -> Tag: Response
+Tag -> Anchor: Final
+Anchor -> Tag: Distance
+
+@enduml

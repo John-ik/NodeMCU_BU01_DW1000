@@ -1,0 +1,27 @@
+@startuml state
+
+[*] --> Idle
+Idle : Соединение сброшено
+Idle --> Idle
+
+Idle --> Pulled : Pull \n(tx Response)
+
+Idle --> Idle : Pull_One \n(tx Response_One)
+
+Pulled --> Idle
+Pulled --> Idle : Final \n(tx Distance)
+
+
+Idle --> Pull_One : timeout or smth \n(toPull_one)
+Pull_One --> Idle : Response_One \n(GOT distance)
+
+Idle --> Pulling : timeout or smth \n(tx Pull)
+
+Pulling --> Idle
+Pulling --> Finaling : Response \n(tx Final)
+
+Finaling --> Idle
+Finaling --> Idle : Distance \n(GOT distance val)
+
+
+@enduml
