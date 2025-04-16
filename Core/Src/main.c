@@ -547,7 +547,9 @@ int main(void)
   }
 
   /* Configure DW1000. See NOTE 6 below. */
-  dwt_configure(&config);
+  if(dwt_configure(&config) == DWT_ERROR){
+    DEBUG_transmit_str("!!! CONFIGURE ERROR !!!");
+  }
 
   
   dwt_txconfig_t txconfig;
