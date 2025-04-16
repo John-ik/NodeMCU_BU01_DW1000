@@ -68,7 +68,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-char uart_buf[256]; 
+char uart_buf[512]; 
 
 static dwt_config_t config =
 {
