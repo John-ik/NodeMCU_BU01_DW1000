@@ -368,8 +368,9 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts)
 
 /*! @brief 
  @param[in] msg MacMessage
- @param[in] tx_mode pass to @refitem `dwt_starttx`
- @return DWT_SUCCESS for success, or DWT_ERROR for error (e.g. a delayed transmission will fail if the delayed time has passed)
+ @param[in] tx_mode pass to `dwt_starttx`
+ @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed),
+          or `-2` for MSG_ERROR_RX-TX types
 */
 int sendtx(MacMessage msg, uint8 tx_mode){
   uint16 frame_len = msg2bytes(msg, tx_buffer);
@@ -459,7 +460,7 @@ void step(MsgEvent event){
           pull_one_msg.src_addr  = my_addr;
           
           sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-          break;
+          return;
 
         case MSG_PULL_ONE: // in STATE_Receive
           pull_rx_ts =  (get_rx_timestamp_u64());
@@ -475,14 +476,13 @@ void step(MsgEvent event){
           resp_one_msg.data.resp_one.resp_tx_ts = (uint32)resp_tx_time;
     
           
-          sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-          break;
+          return;
 
         default: // in STATE_Receive
           toReceiveInTime(0);
-          break;
+          return;
       }
-      break;
+      return;
 
     case STATE_Pull_one:
       switch(event){
@@ -490,18 +490,18 @@ void step(MsgEvent event){
           DEBUG_transmit_str("resp_one");
           toReceive();
           state = STATE_Receive; // state mutate
-          break;
+          return;
 
         default: // in STATE_Pull_one
           DEBUG_transmit_str("pull_one: default");
           toReceive();
           state = STATE_Receive; // state mutate
-          break;
+          return;
       }
-      break;
+      return;
 
     default:
-      break;
+      return;
   }
 }
 
