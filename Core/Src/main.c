@@ -613,7 +613,15 @@ int main(void)
       was_timer = HAL_GetTick() - timer >= timer_timeout;
       if (was_timer)
         dwt_forcetrxoff(); // shutdown TX/RX
+      #endif
     }
+    if (status_reg & SYS_STATUS_CLKPLL_LL){
+      DEBUG_transmit_str("!!! Clock PLL Losing Lock. !!!");
+    }
+    if (status_reg & SYS_STATUS_RFPLL_LL){
+      DEBUG_transmit_str("!!! RF PLL Losing Lock. !!!");
+    }
+
     
     led_signal(1);
     MyEvents event = 0;
