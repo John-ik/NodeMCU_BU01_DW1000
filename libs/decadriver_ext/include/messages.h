@@ -35,6 +35,8 @@ MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext){
 #define MSG_RESPONSE 0x22
 #define MSG_FINAL    0x33
 #define MSG_DISTANCE 0x44
+#define MSG_ERROR_TX 0xF1
+#define MSG_ERROR_RX 0xF2
 
 typedef union {
     uint8 _empty;
@@ -42,9 +44,24 @@ typedef union {
         uint32 pull_rx_ts;
         uint32 resp_tx_ts;
     } resp_one;
+
+    /**
+     * rx_code: check MSG_ERROR_RX_CODE_...
+     * tx_code: check MSG_ERROR_TX_CODE_...
+     * 
+     * field:
+     *      RX -> UNDEFINED_TYPE -> type received byte
+     *      RX -> NOT_EQUAL_LEN  -> receive len into 16:31 bits; i into 0:15
+     */
+    struct {
+        uint8 rx_code;
+        uint8 tx_code;
+        uint32 field; 
+    } error;
+    
 } Msg_Data;
 
-#define MSG_DATA_EMPTY (const Msg_Data){._empty=0}
+#define MSG_DATA_EMPTY {._empty=0}
 
 typedef struct {
     uint16 frame_control;
@@ -56,6 +73,24 @@ typedef struct {
     Msg_Data data;
     uint16 _crc;
 } MacMessage;
+
+#define MAC_MESSAGE_create(ctrl, msg_type) {   \
+        .frame_control=ctrl,                   \
+        .seq_num=0,                            \
+        .dest_pan=0,                           \
+        .dest_addr=0,                          \
+        .src_addr=0,                           \
+        .type=msg_type,                        \
+        .data=MSG_DATA_EMPTY,                  \
+        ._crc=0                                \
+    }
+
+#define MSG_ERROR_RX_CODE_UNDEFINED_TYPE 0x01
+#define MSG_ERROR_RX_CODE_NOT_EQUAL_LEN  0x02
+
+MacMessage error_rx_msg = MAC_MESSAGE_create(0x4188, MSG_ERROR_RX);
+MacMessage error_tx_msg = MAC_MESSAGE_create(0x4188, MSG_ERROR_TX);
+
 
 #define WRITEMSG2BYTES_1(out, what, i) \
     *(out + i++) = what & 0xFF
@@ -85,6 +120,12 @@ uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]){
         case MSG_PULL_ONE:
         case MSG_PULL:
             break;
+
+        case MSG_ERROR_RX:
+        case MSG_ERROR_TX:
+            WRITEMSG2BYTES_4(out, 0xDEADBEEF, i);
+            break;
+
         default:
             return 0;
     }
@@ -92,24 +133,43 @@ uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]){
     return i;
 }
 
+#define READBYTES2MSG_1(input, i) (input[i++])
+#define READBYTES2MSG_2(input, i) ((input[i] << 8) | (input[i+1])); i += 2
+#define READBYTES2MSG_4(input, i) ((input[i] << 16) | (input[i+1] << 8) | (input[i+2]) | (input[i+3])); i += 4
+//TODO: for timestamps
+//#define READBYTES2MSG_5
+
 MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len){
     MacMessage msg; uint16 i = 0;
-    msg.frame_control = ((uint16)input[0] << 8) | input[1]; i += 2;
-    msg.seq_num = input[i++];
-    msg.dest_pan = ((uint16)input[i] << 8) | input[i+1]; i += 2;
-    msg.dest_addr= ((uint16)input[i] << 8) | input[i+1]; i += 2;
-    msg.src_addr = ((uint16)input[i] << 8) | input[i+1]; i += 2;
-    msg.type = input[i++];
+    msg.frame_control = READBYTES2MSG_2(input, i);
+    msg.seq_num = READBYTES2MSG_1(input, i);
+    msg.dest_pan = READBYTES2MSG_2(input, i);
+    msg.dest_addr= READBYTES2MSG_2(input, i);
+    msg.src_addr = READBYTES2MSG_2(input, i);
+    msg.type = READBYTES2MSG_1(input, i);
     switch(msg.type){
         case MSG_RESP_ONE:
-            msg.data.resp_one.pull_rx_ts = ((uint32)input[i] << 24)|((uint32)input[i+1] << 16)|((uint32)input[i+2] << 8)|(input[i+3]); i+= 3;
-            msg.data.resp_one.resp_tx_ts = ((uint32)input[i] << 24)|((uint32)input[i+1] << 16)|((uint32)input[i+2] << 8)|(input[i+3]); i+= 3;
+            msg.data.resp_one.pull_rx_ts = READBYTES2MSG_4(input, i);
+            msg.data.resp_one.resp_tx_ts = READBYTES2MSG_4(input, i);
+            break;
+        case MSG_PULL_ONE:
             break;
         default:
+            msg.data.error.rx_code = MSG_ERROR_RX_CODE_UNDEFINED_TYPE;
+            msg.data.error.field   = msg.type;
+            msg.type = MSG_ERROR_RX;
             break;
     }
-    msg._crc = (input[msg_len-1] << 8) | (input[msg_len]);
-    return msg;
+
+    msg._crc = READBYTES2MSG_2(input, i);
+    if (msg_len == i)
+        return msg;
+    else{
+        msg.type = MSG_ERROR_RX;
+        msg.data.error.rx_code = MSG_ERROR_RX_CODE_NOT_EQUAL_LEN;
+        msg.data.error.field   = (msg_len << 16) | (i);
+        return error_tx_msg;
+    }
 }
 
 
@@ -127,6 +187,8 @@ char* showEvent(MyEvents event){
         case MSG_RESPONSE: return "EVENT_msg_response";
         case MSG_FINAL:    return "EVENT_msg_final";
         case MSG_DISTANCE: return "EVENT_msg_distance";
+        case MSG_ERROR_RX: return "! EVENT_msg_ERROR_RX !";
+        case MSG_ERROR_TX: return "! EVENT_msg_ERROR_TX !";
 
         default: 
             sprintf(default_str, default_str, event);
@@ -157,6 +219,16 @@ void showMsg(char* str, MacMessage msg){
                                 "\tresp_tx_ts = %u",
                 msg.data.resp_one.pull_rx_ts, msg.data.resp_one.resp_tx_ts);
             break;
+        case MSG_ERROR_RX:
+            sprintf(data_buf,   "\trx_code = 0x%X"
+                                "\tfield = 0x%X", 
+                    msg.data.error.rx_code, msg.data.error.field);
+            break;
+        case MSG_ERROR_TX:
+            sprintf(data_buf,   "\ttx_code = 0x%X"
+                                "\tfield = 0x%X", 
+                    msg.data.error.tx_code, msg.data.error.field);
+            break;
         default:
             return;
     }
@@ -171,7 +243,7 @@ void showMsg(char* str, MacMessage msg){
 
     sprintf(str, "MSG %s\n"
                     "\tctrl = 0x%X\n"
-                    "\tseq = %d\n"
+                    "\tseq = %u\n"
                     "\tdest_pan = 0x%X\n"
                     "\tdest_addr = 0x%X\n"
                     "\tsrc = 0x%X\n"
