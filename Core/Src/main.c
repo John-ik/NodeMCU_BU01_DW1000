@@ -550,21 +550,24 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  deca_sleep(100);
+  HAL_Delay(100);
   
-  while (dwt_initialise(DWT_LOADUCODE) == -1){
+  while (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR){
     DEBUG_transmit_str("ERRORO");
     reset_DW1000();
   }
-  deca_sleep(100);
+  HAL_Delay(100);
 
   /* Configure DW1000. See NOTE 6 below. */
   if(dwt_configure(&config) == DWT_ERROR){
     DEBUG_transmit_str("!!! CONFIGURE ERROR !!!");
   }
 
-  
-  dwt_txconfig_t txconfig;
+  // recommended from Software_API_Guide
+  dwt_txconfig_t txconfig = {
+    .PGdly = 0xC0,
+    .power = 0x0E082848
+  };
   configureTXPower(&txconfig);
 
   /* Apply default antenna delay value. See NOTE 1 below. */
@@ -594,7 +597,7 @@ int main(void)
   uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
   DEBUG_transmit_fmt("Sys_cfg = 0x%X; Status = 0x%X", cfg, dwt_read32bitreg(SYS_STATUS_ID));
 
-  dwt_write32bitoffsetreg(DIG_DIAG_ID, 0, EVC_EN); // turn on diag counters
+  dwt_configeventcounters(1); // enalbe counters for diagnostics
 
 
   // INITIAL STATE
@@ -692,7 +695,8 @@ int main(void)
       // clear errors
       dwt_write32bitreg(SYS_STATE_ID, SYS_STATUS_ALL_RX_ERR);
       // reset receiver for correctly calc timestamp in future
-      softreset_receiver();
+      // softreset_receiver();
+      dwt_rxreset();
 
       // if (HAL_GetTick() - timer > 5000){
       //   event = toMsgEvent(0, 0, EVENT_initiate_pull_one);
