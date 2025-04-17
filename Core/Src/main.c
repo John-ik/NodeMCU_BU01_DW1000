@@ -73,15 +73,15 @@ char uart_buf[512];
 static dwt_config_t config =
 {
     5,               /* Channel number. */
-    DWT_PRF_64M,     /* Pulse repetition frequency. */
-    DWT_PLEN_1024,   /* Preamble length. */
-    DWT_PAC32,       /* Preamble acquisition chunk size. Used in RX only. */
-    9,               /* TX preamble code. Used in TX only. */
-    9,               /* RX preamble code. Used in RX only. */
-    1,               /* Use non-standard SFD (Boolean) */
-    DWT_BR_110K,     /* Data rate. */
+    DWT_PRF_16M,     /* Pulse repetition frequency. */
+    DWT_PLEN_128,   /* Preamble length. */
+    DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
+    4,               /* TX preamble code. Used in TX only. */
+    4,               /* RX preamble code. Used in RX only. */
+    0,               /* Use non-standard SFD (Boolean) */
+    DWT_BR_6M8,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
-    (1025 + 64 - 32) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+    (128 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
 /* Frames used in the ranging process. See NOTE 2 below. */
@@ -169,8 +169,8 @@ static uint32 status_reg = 0;
 #define RESP_RX_TIMEOUT_UUS 2700
 
 
-#define REQUEST_TO_RESPONSE_DELAY 2800
-
+#define REQUEST_TO_RESPONSE_DELAY 0
+static uint16 request_to_response_delay = 100; 
 
 /* Timestamps of frames transmission/reception.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -182,7 +182,7 @@ typedef unsigned long long uint64;
 #define SPEED_OF_LIGHT 299702547
 #endif
 
-static size_t debug_counter;
+static int debug_var;
 
 /*
  new ID system
@@ -371,18 +371,20 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts)
  @param[in] tx_mode pass to `dwt_starttx`
  @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed),
           or `-2` for MSG_ERROR_RX-TX types
-*/
+ */
 int sendtx(MacMessage msg, uint8 tx_mode){
   uint16 frame_len = msg2bytes(msg, tx_buffer);
 
-  showMsg(uart_buf, msg);
-  DEBUG_transmit_fmt("tx %s", uart_buf);
-  DEBUG_transmit_b10("tx", tx_buffer);
+  // showMsg(uart_buf, msg);
+  // DEBUG_transmit_fmt("TXing: %s", uart_buf);
+
+  if (msg.type == MSG_ERROR_RX || msg.type == MSG_ERROR_TX)
+    return -2;
 
   dwt_writetxdata(frame_len, tx_buffer, 0);
   dwt_writetxfctrl(frame_len, 0);
 
-  return dwt_starttx(tx_mode);
+  return debug_var = dwt_starttx(tx_mode);
 }
 
 uint16 recieverx(){
@@ -392,13 +394,13 @@ uint16 recieverx(){
 
     msg_buffer = bytes2msg(rx_buffer, frame_len);
     
-    dwt_readfromdevice(RX_TIME_ID, 0, 14, rx_buffer);
-    char* uart_buf_ptr = uart_buf; 
-    for (size_t i = 0; i < 14; i++){
-      sprintf(uart_buf_ptr, "%02X", rx_buffer[i]);
-      uart_buf_ptr += 2;
-    }
-    DEBUG_transmit_fmt("reg 0x15 RX_TIME = %s", uart_buf);
+    // dwt_readfromdevice(RX_TIME_ID, 0, 14, rx_buffer);
+    // char* uart_buf_ptr = uart_buf; 
+    // for (size_t i = 0; i < 14; i++){
+    //   sprintf(uart_buf_ptr, "%02X", rx_buffer[i]);
+    //   uart_buf_ptr += 2;
+    // }
+    // DEBUG_transmit_fmt("reg 0x15 RX_TIME = %s", uart_buf);
   }
   return frame_len;
 }
@@ -459,13 +461,17 @@ void step(MsgEvent event){
           pull_one_msg.dest_addr = 0xFFFF;
           pull_one_msg.src_addr  = my_addr;
           
+          state = STATE_Pull_one; // mutate state
+
           sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
           return;
 
         case MSG_PULL_ONE: // in STATE_Receive
-          pull_rx_ts =  (get_rx_timestamp_u64());
-          resp_tx_time = (pull_rx_ts + (REQUEST_TO_RESPONSE_DELAY * UUS_TO_DWT_TIME));
+          led_signal(3);
+          pull_rx_ts = dwt_readrxtimestamphi32() << 8;
+          resp_tx_time = (pull_rx_ts + (request_to_response_delay * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32)(resp_tx_time >> 8)); 
+          //? set rx timreout and rxaftertxdelay
 
           // uint64 resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
           resp_one_msg.seq_num   = msg_buffer.seq_num;
@@ -473,9 +479,14 @@ void step(MsgEvent event){
           resp_one_msg.dest_pan  = MY_PAN_ID;
           resp_one_msg.src_addr  = my_addr;
           resp_one_msg.data.resp_one.pull_rx_ts = (uint32)pull_rx_ts;
-          resp_one_msg.data.resp_one.resp_tx_ts = (uint32)resp_tx_time;
-    
-          
+          resp_one_msg.data.resp_one.resp_tx_ts = (uint32)resp_tx_time; // + TX_ANT_DLY
+
+          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+          if (err == DWT_ERROR) // correct delay
+            request_to_response_delay += 100;
+          dwt_rxenable(0);
+          // DEBUG_transmit_fmt("debug: %X00, %X00, %X00", (uint32)pull_rx_ts >> 8, (uint32)resp_tx_time >> 8, (uint32)debug_var >> 8);
+
           return;
 
         default: // in STATE_Receive
@@ -539,12 +550,13 @@ int main(void)
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  reset_DW1000();
+  deca_sleep(100);
   
   while (dwt_initialise(DWT_LOADUCODE) == -1){
     DEBUG_transmit_str("ERRORO");
     reset_DW1000();
   }
+  deca_sleep(100);
 
   /* Configure DW1000. See NOTE 6 below. */
   if(dwt_configure(&config) == DWT_ERROR){
@@ -562,17 +574,17 @@ int main(void)
   DEBUG_transmit_str("INITED");
 
 
-  // set TX/RX leds
-  {
-    dwt_on_deboundsclock();
-    dwt_blinking_enable();
-    dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
-    dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
-    dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
-    deca_sleep(10);
-    // blink all leds
-    dwt_blink_leds();
-  }
+  // // set TX/RX leds
+  // {
+  //   dwt_on_deboundsclock();
+  //   dwt_blinking_enable();
+  //   dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
+  //   dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
+  //   dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
+  //   deca_sleep(10);
+  //   // blink all leds
+  //   dwt_blink_leds();
+  // }
 
   // PRINT WHO IS WHO
   DEBUG_transmit_fmt("I am is a %s", IAMIS);
@@ -580,9 +592,9 @@ int main(void)
   // Confifure filtering
   // dwt_enableframefilter(DWT_FF_DATA_EN);
   uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
-  DEBUG_transmit_fmt("0x%X", cfg);
+  DEBUG_transmit_fmt("Sys_cfg = 0x%X; Status = 0x%X", cfg, dwt_read32bitreg(SYS_STATUS_ID));
 
-  dwt_write32bitoffsetreg(DIG_DIAG_ID, 0, EVC_EN);
+  dwt_write32bitoffsetreg(DIG_DIAG_ID, 0, EVC_EN); // turn on diag counters
 
 
   // INITIAL STATE
@@ -603,16 +615,24 @@ int main(void)
     /* USER CODE BEGIN 3 */
     led_signal(0);
 
+    
+    
+
     uint8 was_timer = 0;
     uint32 timer_timeout = 1000;
     { // wait for RX or user timeout
       uint32 timer = HAL_GetTick();
-      while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))
-            && (HAL_GetTick() - timer < timer_timeout))
+      while (
+        !((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_CLKPLL_LL | SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))
+        #ifdef TAG
+          && (HAL_GetTick() - timer < timer_timeout)
+        #endif
+          )
       { }; // Wait Recieve Good or Error
-      was_timer = HAL_GetTick() - timer >= timer_timeout;
-      if (was_timer)
-        dwt_forcetrxoff(); // shutdown TX/RX
+      #ifdef TAG
+        was_timer = HAL_GetTick() - timer >= timer_timeout;
+        if (was_timer)
+          dwt_forcetrxoff(); // shutdown TX/RX
       #endif
     }
     if (status_reg & SYS_STATUS_CLKPLL_LL){
@@ -622,7 +642,7 @@ int main(void)
       DEBUG_transmit_str("!!! RF PLL Losing Lock. !!!");
     }
 
-    
+
     led_signal(1);
     MyEvents event = 0;
     if (STATUS_OK(status_reg)){
@@ -633,15 +653,40 @@ int main(void)
       
       event = toMsgEvent(status_reg, msg_buffer.type, 0);
       
-      showMsg(uart_buf, msg_buffer);
-      DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamplo32());
+      // showMsg(uart_buf, msg_buffer);
+      // DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamplo32());
     }else if (was_timer){
       event = EVENT_rxtimeout;
 
-      static uint32 timer_pull_one = 0; 
-      if (HAL_GetTick() - timer_pull_one > 5000){
-        timer_pull_one = HAL_GetTick();
-        event = EVENT_initiate_pull_one;
+      #ifdef TAG
+        static uint32 timer_pull_one = 0; 
+        if (HAL_GetTick() - timer_pull_one > 5000){
+          timer_pull_one = HAL_GetTick();
+          event = EVENT_initiate_pull_one;
+        }
+      #endif
+
+      // dump Digital Diagnostics Interface
+      {
+          dwt_deviceentcnts_t cntrs;
+          dwt_readeventcounters(&cntrs);
+          DEBUG_transmit_fmt("DIAG:\n"
+                            "\tPHR er = %u"
+                            "\tRSD er = %u"
+                            "\tcrc good = %u"
+                            "\tcrc bad = %u"
+                            "\tframe filter reject = %u"
+                            "\toverrun = %u"
+                            "\tsfd timeout = %u"
+                            "\tpreamble timeout = %u"
+                            "\tRX timeout = %u"
+                            "\tTX sent = %u"
+                            "\tperiod/2 (big TX delay)= %u"
+                            "\tshort TX delay = %u\n"
+                            "\treq2resp = %u", 
+            cntrs.PHE, cntrs.RSL, cntrs.CRCG, cntrs.CRCB, cntrs.ARFE, cntrs.OVER, cntrs.SFDTO, cntrs.PTO, cntrs.RTO, cntrs.TXF, cntrs.HPW, cntrs.TXW,
+            request_to_response_delay
+          );
       }
     }else{
       // clear errors
@@ -658,7 +703,7 @@ int main(void)
     }
     DEBUG_transmit_fmt("BEFORE STEP: event = %s; state = %s; Status_reg = %u", showEvent(event), showState(state), status_reg);
     step(event);
-    DEBUG_transmit_fmt("AFTER STEP: state = %s", showState(state));
+    DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; delay = %u", showState(state), debug_var, request_to_response_delay);
   }
   /* USER CODE END 3 */
 }
