@@ -107,8 +107,10 @@ int main(void)
   HAL_Delay(500);
   DEBUG_transmit_str("4");
   // spi_set_rate_low();
+  led_signal(1);
   while (dwt_initialise(DWT_LOADNONE) == DWT_ERROR)
   {
+      led_signal(2);
       DEBUG_transmit_str("intitialize error");
       reset_DW1000();
       HAL_Delay(500);
@@ -120,6 +122,7 @@ int main(void)
   dwt_configure(&config);
 
   DEBUG_transmit_fmt("status = %u", dwt_read32bitreg(SYS_STATUS_ID));
+  led_signal(3);
 
   /* Loop forever sending frames periodically. */
   while(1)
