@@ -7,21 +7,22 @@
 
 // -------------------- CONFIG --------------------
 
-#define DW_SPI hspi1
+#define SPIx SPI1
 
 #define DW_SPI_TIMEOUT 1000
 
-#define DW_CS_Port  CSN_GPIO_Port
-#define DW_CS_Pin   CSN_Pin
+#define SPIx_CS_GPIO  CSN_GPIO_Port
+#define SPIx_CS   CSN_Pin
 
 #define DW_IRQ_Port IRQ_GPIO_Port
 #define DW_IRQ_Pin  IRQ_Pin
 #define DW_EXTI_IRQ      EXTI0_IRQn
 
-#define DW_RST_Port RST_GPIO_Port
-#define DW_RST_Pin  RST_Pin
+#define DW1000_RSTn_GPIO RST_GPIO_Port
+#define DW1000_RSTn  RST_Pin
 
 // -------------------- CONSTS --------------------
+#define DECA_MAX_SPI_HEADER_LENGTH      (3)                     // max number of bytes in header (for formating & sizing)
 
 // -------------------- PLATFORM SPECIFIC API --------------------
 

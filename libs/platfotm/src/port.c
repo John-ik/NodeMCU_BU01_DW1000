@@ -54,22 +54,22 @@ void led_signal (uint8_t signal){
 
 void reset_DW1000(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
 
-    // Enable GPIO used for DW1000 reset
-    GPIO_InitStructure.Pin = DW_RST_Pin;
-    GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
-    HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
+	// Enable GPIO used for DW1000 reset
+	GPIO_InitStructure.Pin = DW1000_RSTn;
+	GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+	HAL_GPIO_Init(DW1000_RSTn_GPIO, &GPIO_InitStructure);
 
-    //drive the RSTn pin low
-    HAL_GPIO_WritePin(DW_RST_Port, DW_RST_Pin, 0);
+	//drive the RSTn pin low
+	HAL_GPIO_WritePin(DW1000_RSTn_GPIO, DW1000_RSTn, 0);
 
-    //put the pin back to tri-state ... as input
-    GPIO_InitStructure.Pin = DW_RST_Pin;
-    GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
-    HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
+	//put the pin back to tri-state ... as input
+	GPIO_InitStructure.Pin = DW1000_RSTn;
+	GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
+	GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+	HAL_GPIO_Init(DW1000_RSTn_GPIO, &GPIO_InitStructure);
 
-    HAL_Delay(500);
+    HAL_Delay(2);
 }
