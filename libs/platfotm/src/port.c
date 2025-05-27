@@ -65,11 +65,13 @@ void reset_DW1000(void)
     //drive the RSTn pin low
     HAL_GPIO_WritePin(DW_RST_Port, DW_RST_Pin, 0);
 
+    HAL_Delay(2);
+
     //put the pin back to tri-state ... as input
     GPIO_InitStructure.Pin = DW_RST_Pin;
     GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
     GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
     HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
 
-    HAL_Delay(500);
+    HAL_Delay(10);
 }
