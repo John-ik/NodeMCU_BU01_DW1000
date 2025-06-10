@@ -1,5 +1,5 @@
 #pragma once
-#ifdef DEBUG_UART_TRANSMIT
+// #ifdef DEBUG
 
 #include "usart.h"
 
@@ -19,10 +19,4 @@ extern char uart_buf[];
 
 #define DEBUG_transmit_b10(str, bytes) DEBUG_transmit_fmt(str " = 0x%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X", bytes[0],bytes[1],bytes[2],bytes[3],bytes[4],bytes[5],bytes[6],bytes[7],bytes[8],bytes[9])
 
-#else
-
-#define DEBUG_transmit_fmt(fmt, ...) __NOP()
-#define DEBUG_transmit_str(str) __NOP()
-#define DEBUG_transmit_b10(str, bytes) __NOP()
-
-#endif
+// #endif

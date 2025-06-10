@@ -86,7 +86,9 @@ void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = RST_Pin;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_FLOATING;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
