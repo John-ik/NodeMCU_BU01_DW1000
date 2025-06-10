@@ -71,6 +71,7 @@ void reset_DW1000(void)
     GPIO_InitStructure.Pin = DW_RST_Pin;
     GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
     GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
+    GPIO_InitStructure.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
 
     HAL_Delay(10);
