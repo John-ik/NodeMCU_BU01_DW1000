@@ -38,6 +38,7 @@
 #include "event.h"
 
 #include "port.h"
+#include "platform_spi.h"
 
 #include "string.h"
 #include "stdio.h"
@@ -74,14 +75,14 @@ static dwt_config_t config =
 {
     5,               /* Channel number. */
     DWT_PRF_16M,     /* Pulse repetition frequency. */
-    DWT_PLEN_128,   /* Preamble length. */
+    DWT_PLEN_2048,   /* Preamble length. */
     DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
     4,               /* TX preamble code. Used in TX only. */
     4,               /* RX preamble code. Used in RX only. */
     0,               /* Use non-standard SFD (Boolean) */
-    DWT_BR_6M8,     /* Data rate. */
+    DWT_BR_110K,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
-    (128 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+    0 // (2048 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
 /* Frames used in the ranging process. See NOTE 2 below. */
@@ -551,11 +552,19 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(100);
+  reset_DW1000();
+  HAL_Delay(100);
   
+  
+  DEBUG_transmit_str("starting");
+  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
+  spi_low_speed();
+  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
   while (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR){
     DEBUG_transmit_str("ERRORO");
     reset_DW1000();
   }
+  spi_full_speed();
   HAL_Delay(100);
 
   /* Configure DW1000. See NOTE 6 below. */
@@ -608,13 +617,13 @@ int main(void)
   dwt_setrxtimeout(0);
   dwt_rxenable(0); // start RX
   /* USER CODE END 2 */
-  
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-    
+
     /* USER CODE BEGIN 3 */
     led_signal(0);
 
@@ -626,7 +635,7 @@ int main(void)
     { // wait for RX or user timeout
       uint32 timer = HAL_GetTick();
       while (
-        !((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_CLKPLL_LL | SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))
+        !((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))
         #ifdef TAG
           && (HAL_GetTick() - timer < timer_timeout)
         #endif
@@ -656,8 +665,8 @@ int main(void)
       
       event = toMsgEvent(status_reg, msg_buffer.type, 0);
       
-      // showMsg(uart_buf, msg_buffer);
-      // DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamplo32());
+      showMsg(uart_buf, msg_buffer);
+      DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamplo32());
     }else if (was_timer){
       event = EVENT_rxtimeout;
 
@@ -727,7 +736,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -737,12 +748,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -783,70 +794,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-/*****************************************************************************************************************************************************
- * NOTES:
- *
- * 1. The sum of the values is the TX to RX antenna delay, experimentally determined by a calibration process. Here we use a hard coded typical value
- *    but, in a real application, each device should have its own antenna delay properly calibrated to get the best possible precision when performing
- *    range measurements.
- * 2. The messages here are similar to those used in the DecaRanging ARM application (shipped with EVK1000 kit). They comply with the IEEE
- *    802.15.4 standard MAC data frame encoding and they are following the ISO/IEC:24730-62:2013 standard. The messages used are:
- *     - a poll message sent by the initiator to trigger the ranging exchange.
- *     - a response message sent by the responder allowing the initiator to go on with the process
- *     - a final message sent by the initiator to complete the exchange and provide all information needed by the responder to compute the
- *       time-of-flight (distance) estimate.
- *    The first 10 bytes of those frame are common and are composed of the following fields:
- *     - byte 0/1: frame control (0x8841 to indicate a data frame using 16-bit addressing).
- *     - byte 2: sequence number, incremented for each new frame.
- *     - byte 3/4: PAN ID (0xDECA).
- *     - byte 5/6: destination address, see NOTE 3 below.
- *     - byte 7/8: source address, see NOTE 3 below.
- *     - byte 9: function code (specific values to indicate which message it is in the ranging process).
- *    The remaining bytes are specific to each message as follows:
- *    Poll message:
- *     - no more data
- *    Response message:
- *     - byte 10: activity code (0x02 to tell the initiator to go on with the ranging exchange).
- *     - byte 11/12: activity parameter, not used for activity code 0x02.
- *    Final message:
- *     - byte 10 -> 13: poll message transmission timestamp.
- *     - byte 14 -> 17: response message reception timestamp.
- *     - byte 18 -> 21: final message transmission timestamp.
- *    All messages end with a 2-byte checksum automatically set by DW1000.
- * 3. Source and destination addresses are hard coded constants in this example to keep it simple but for a real product every device should have a
- *    unique ID. Here, 16-bit addressing is used to keep the messages as short as possible but, in an actual application, this should be done only
- *    after an exchange of specific messages used to define those short addresses for each device participating to the ranging exchange.
- * 4. Delays between frames have been chosen here to ensure proper synchronisation of transmission and reception of the frames between the initiator
- *    and the responder and to ensure a correct accuracy of the computed distance. The user is referred to DecaRanging ARM Source Code Guide for more
- *    details about the timings involved in the ranging process.
- * 5. This timeout is for complete reception of a frame, i.e. timeout duration must take into account the length of the expected frame. Here the value
- *    is arbitrary but chosen large enough to make sure that there is enough time to receive the complete final frame sent by the responder at the
- *    110k data rate used (around 3.5 ms).
- * 6. In a real application, for optimum performance within regulatory limits, it may be necessary to set TX pulse bandwidth and TX power, (using
- *    the dwt_configuretxrf API call) to per device calibrated values saved in the target system or the DW1000 OTP memory.
- * 7. We use polled mode of operation here to keep the example as simple as possible but all status events can be used to generate interrupts. Please
- *    refer to DW1000 User Manual for more details on "interrupts". It is also to be noted that STATUS register is 5 bytes long but, as the event we
- *    use are all in the first bytes of the register, we can use the simple dwt_read32bitreg() API call to access it instead of reading the whole 5
- *    bytes.
- * 8. Timestamps and delayed transmission time are both expressed in device time units so we just have to add the desired response delay to poll RX
- *    timestamp to get response transmission time. The delayed transmission time resolution is 512 device time units which means that the lower 9 bits
- *    of the obtained value must be zeroed. This also allows to encode the 40-bit value in a 32-bit words by shifting the all-zero lower 8 bits.
- * 9. dwt_writetxdata() takes the full size of the message as a parameter but only copies (size - 2) bytes as the check-sum at the end of the frame is
- *    automatically appended by the DW1000. This means that our variable could be two bytes shorter without losing any data (but the sizeof would not
- *    work anymore then as we would still have to indicate the full length of the frame to dwt_writetxdata()). It is also to be noted that, when using
- *    delayed send, the time set for transmission must be far enough in the future so that the DW1000 IC has the time to process and start the
- *    transmission of the frame at the wanted time. If the transmission command is issued too late compared to when the frame is supposed to be sent,
- *    this is indicated by an error code returned by dwt_starttx() API call. Here it is not tested, as the values of the delays between frames have
- *    been carefully defined to avoid this situation.
- * 10. The high order byte of each 40-bit time-stamps is discarded here. This is acceptable as, on each device, those time-stamps are not separated by
- *     more than 2**32 device time units (which is around 67 ms) which means that the calculation of the round-trip delays can be handled by a 32-bit
- *     subtraction.
- * 11. The user is referred to DecaRanging ARM application (distributed with EVK1000 product) for additional practical example of usage, and to the
- *     DW1000 API Guide for more details on the DW1000 driver functions.
- ****************************************************************************************************************************************************/
-
-/**
-  * @}
-  */
-/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
