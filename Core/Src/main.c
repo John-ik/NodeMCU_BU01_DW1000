@@ -574,11 +574,11 @@ int main(void)
   }
 
   // recommended from Software_API_Guide
-  dwt_txconfig_t txconfig = {
-    .PGdly = 0xC0,
-    .power = 0x0E082848
-  };
-  configureTXPower(&txconfig);
+  // dwt_txconfig_t txconfig = {
+  //   .PGdly = 0xC0,
+  //   .power = 0x0E082848
+  // };
+  // configureTXPower(&txconfig);
 
   /* Apply default antenna delay value. See NOTE 1 below. */
   dwt_setrxantennadelay(RX_ANT_DLY);
