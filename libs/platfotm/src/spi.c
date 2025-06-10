@@ -149,9 +149,9 @@ int spi_set_BaudRatePrescaler(uint32_t prescaler){
 
 
 int spi_low_speed(){
-  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_32);
+  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_128);
 }
 
 int spi_full_speed(){
-  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_4);
+  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_16);
 }
