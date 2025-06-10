@@ -43,6 +43,7 @@
 #include "string.h"
 #include "stdio.h"
 
+#define DEBUG_UART_TRANSMIT
 #include "debug.h"
 
 /* USER CODE END Includes */
