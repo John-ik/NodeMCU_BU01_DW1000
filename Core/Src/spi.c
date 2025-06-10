@@ -67,13 +67,9 @@ void MX_SPI1_Init(void)
   SPI_InitStruct.BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV16;
   SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
   SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;
-  SPI_InitStruct.CRCPoly = 7;
-  // LL_SPI_Init(SPI1, &SPI_InitStruct);
-  /* USER CODE BEGIN SPI1_Init 2 */
-  __HAL_RCC_SPI1_CLK_ENABLE();
-  __HAL_RCC_SPI1_FORCE_RESET();
-  __HAL_RCC_SPI1_RELEASE_RESET();
+  SPI_InitStruct.CRCPoly = 10;
   LL_SPI_Init(SPI1, &SPI_InitStruct);
+  /* USER CODE BEGIN SPI1_Init 2 */
   LL_SPI_Enable(SPI1);
   /* USER CODE END SPI1_Init 2 */
 
