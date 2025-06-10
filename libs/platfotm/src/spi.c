@@ -5,6 +5,7 @@
 
 #include "string.h"
 
+#define DEBUG_UART_TRANSMIT
 #include "debug.h"
 
 
@@ -153,5 +154,5 @@ int spi_low_speed(){
 }
 
 int spi_full_speed(){
-  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_4);
+  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_16);
 }

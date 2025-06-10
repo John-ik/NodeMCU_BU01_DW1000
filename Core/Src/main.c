@@ -113,7 +113,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  HAL_Delay(100);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -124,10 +124,14 @@ int main(void)
   HAL_Delay(100);
   // reset_DW1000();
   HAL_Delay(100);
+
+  DEBUG_transmit_fmt("SPI: CR1 = 0x%X, CR2 = 0x%X, DR = 0x%X, SR = 0x%X\n", 
+    SPI1->CR1, SPI1->CR2, SPI1->DR, SPI1->SR
+  );
   
   
   DEBUG_transmit_str("starting");
-  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
+  DEBUG_transmit_fmt("0x%X", dwt_read32bitreg(PMSC_ID));
   spi_low_speed();
   DEBUG_transmit_fmt("0x%X", dwt_readdevid());
   while (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR){
