@@ -3,6 +3,9 @@
 #include "main.h"
 #include "stm32f1xx_hal_spi.h"
 
+
+#define MHZ 1000000
+
 int spi_low_speed();
 
 int spi_full_speed();

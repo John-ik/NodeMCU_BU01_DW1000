@@ -138,20 +138,40 @@ int readfromspi (
 }
 
 
-int spi_set_BaudRatePrescaler(uint32_t prescaler){
+int spi_set_BaudRate(uint32_t baudrate){
+  uint32_t prescaler = SPI_BAUDRATEPRESCALER_256; // set minimal by default
+  uint32_t fCLCL = HAL_RCC_GetHCLKFreq();
+
+  if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_2 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_2;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_4 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_4;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_8 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_8;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_16 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_16;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_32 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_32;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_64 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_64;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_128 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_128;
+  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_256 >> 3)))
+    prescaler = SPI_BAUDRATEPRESCALER_256;
+  
+
   assert_param(IS_SPI_BAUDRATE_PRESCALER(prescaler));
 
-
-  SPI1->CR1 = (SPI1->CR1 & ~SPI_CR1_BR_Msk) | (prescaler & SPI_CR1_BR_Msk);
+  LL_SPI_SetBaudRatePrescaler(SPI1, prescaler);
 
   return HAL_OK;
 }
 
 
 int spi_low_speed(){
-  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_128);
+  return spi_set_BaudRate(2*MHZ);
 }
 
 int spi_full_speed(){
-  return spi_set_BaudRatePrescaler(SPI_BAUDRATEPRESCALER_16);
+  return spi_set_BaudRate(20*MHZ);
 }
