@@ -54,25 +54,34 @@ void led_signal (uint8_t signal){
 
 void reset_DW1000(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
+    // // dw1000 data sheet v2.08 §5.6.1 page 20, the RSTn pin should not be driven high but left floating.
+    // pinMode(_rst, OUTPUT);
+    // digitalWrite(_rst, LOW);
+    // delay(2);  // dw1000 data sheet v2.08 §5.6.1 page 20: nominal 50ns, to be safe take more time
+    // pinMode(_rst, INPUT);
+    // delay(10); // dwm1000 data sheet v1.2 page 5: nominal 3 ms, to be safe take more time
+    // // force into idle mode (although it should be already after reset)
+    // idle();
 
-    // Enable GPIO used for DW1000 reset
-    GPIO_InitStructure.Pin = DW_RST_Pin;
-    GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
-    HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
-
+    // __HAL_RCC_GPIOB_CLK_ENABLE();
+    LL_GPIO_SetPinSpeed(DW_RST_Port, DW_RST_Pin, LL_GPIO_SPEED_FREQ_HIGH);
+    // __HAL_RCC_AFIO_CLK_ENABLE();
+    LL_GPIO_SetPinMode(DW_RST_Port, DW_RST_Pin, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(DW_RST_Port, DW_RST_Pin, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinPull(DW_RST_Port, DW_RST_Pin, GPIO_NOPULL);
+    
     //drive the RSTn pin low
-    HAL_GPIO_WritePin(DW_RST_Port, DW_RST_Pin, 0);
+    LL_GPIO_ResetOutputPin(DW_RST_Port, DW_RST_Pin);
 
     HAL_Delay(2);
 
     //put the pin back to tri-state ... as input
-    GPIO_InitStructure.Pin = DW_RST_Pin;
-    GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
-    GPIO_InitStructure.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(DW_RST_Port, &GPIO_InitStructure);
+    LL_GPIO_SetPinMode(DW_RST_Port, DW_RST_Pin, LL_GPIO_MODE_INPUT);
+    LL_GPIO_SetPinPull(DW_RST_Port, DW_RST_Pin, LL_GPIO_PULL_DOWN);
 
-    HAL_Delay(10);
+    HAL_Delay(2);
+
+    // goto IDLE. Set TRXOFF bit in SYS_CTRL
+    uint32_t tmp = 1 << 6;
+	dwt_write32bitreg(0x0D, tmp);
 }

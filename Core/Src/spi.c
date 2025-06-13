@@ -52,7 +52,9 @@ void MX_SPI1_Init(void)
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   GPIO_InitStruct.Pin = LL_GPIO_PIN_6;
-  GPIO_InitStruct.Mode = LL_GPIO_MODE_FLOATING;
+  GPIO_InitStruct.Mode = LL_GPIO_MODE_INPUT;
+  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN SPI1_Init 1 */
@@ -68,8 +70,11 @@ void MX_SPI1_Init(void)
   SPI_InitStruct.BitOrder = LL_SPI_MSB_FIRST;
   SPI_InitStruct.CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE;
   SPI_InitStruct.CRCPoly = 10;
-  LL_SPI_Init(SPI1, &SPI_InitStruct);
   /* USER CODE BEGIN SPI1_Init 2 */
+  __HAL_RCC_SPI1_CLK_ENABLE();
+  __HAL_RCC_SPI1_FORCE_RESET();
+  __HAL_RCC_SPI1_RELEASE_RESET();
+  LL_SPI_Init(SPI1, &SPI_InitStruct);
   LL_SPI_Enable(SPI1);
   /* USER CODE END SPI1_Init 2 */
 

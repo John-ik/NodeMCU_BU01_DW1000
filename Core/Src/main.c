@@ -236,6 +236,18 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void dwt_custom_softReset() {
+	uint8_t pmscctrl0[PMSC_CTRL0_LEN];
+	dwt_readfromdevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
+	pmscctrl0[0] = 0x01;
+	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
+	pmscctrl0[3] = 0x00;
+	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
+	deca_sleep(10);
+	pmscctrl0[0] = 0x00;
+	pmscctrl0[3] = 0xF0;
+	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
+}
 #define TX_PGDELAY_CH5 0xC5
 
 void configureTXPower(dwt_txconfig_t *config){
@@ -553,7 +565,9 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_Delay(100);
-  reset_DW1000();
+  // reset_DW1000();
+  // dwt_softreset();
+  dwt_custom_softReset();
   HAL_Delay(100);
   
   
