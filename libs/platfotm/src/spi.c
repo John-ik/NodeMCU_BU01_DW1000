@@ -5,6 +5,7 @@
 
 #include "string.h"
 
+#define DEBUG_UART_TRANSMIT
 #include "debug.h"
 
 
@@ -90,10 +91,8 @@ spi_status_e spi_transfer(SPI_TypeDef *spi, const uint8_t *tx_buffer, uint8_t *r
 }
 
 uint8_t spi_transfer_trx(uint8_t data){
-  DEBUG_transmit_fmt("write 0x%X", data);
   spi_status_e e = spi_transfer(SPI1, &data, &data, sizeof(uint8_t));
   if (e) {DEBUG_transmit_fmt("e: %d", e);}
-  DEBUG_transmit_fmt("read 0x%X", data);
   return data;
 }
 
@@ -103,6 +102,10 @@ int writetospi (
     uint32 bodylength, const uint8 *bodyBuffer
 ){
   uint16_t i;
+
+#ifdef DEBUG_UART_TRANSMIT
+  uint32 status_before = dwt_read32bitreg(0x0F);
+#endif
 
   dw_activate();
 
@@ -114,6 +117,8 @@ int writetospi (
 	}
 
   dw_deactivate();
+
+  DEBUG_transmit_fmt("0x%08X header=0x%X 0x%08X", status_before, headerBuffer[0], dwt_read32bitreg(0x0F));
 
   return DWT_SUCCESS;
 }
