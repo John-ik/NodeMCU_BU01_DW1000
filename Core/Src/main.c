@@ -717,7 +717,7 @@ int main(void)
       }
     }else{
       // clear errors
-      dwt_write32bitreg(SYS_STATE_ID, SYS_STATUS_ALL_RX_ERR);
+      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
       // reset receiver for correctly calc timestamp in future
       // softreset_receiver();
       dwt_rxreset();
