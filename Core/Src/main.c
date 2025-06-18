@@ -463,8 +463,6 @@ void toReceiveInTime(uint16 time){
 
 void step(MsgEvent event){
   uint64 pull_rx_ts, resp_tx_time;
-  
-  if (event == EVENT_none) return;
 
   switch(state){
     case STATE_Receive:
