@@ -248,6 +248,7 @@ void dwt_custom_softReset() {
 	pmscctrl0[0] = 0x00;
 	pmscctrl0[3] = 0xF0;
 	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
+  deca_sleep(10);
 }
 #define TX_PGDELAY_CH5 0xC5
 
