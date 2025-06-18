@@ -71,7 +71,7 @@
 
 /* USER CODE BEGIN PV */
 char uart_buf[512]; 
-char DEBUG_uart_buf[512]; 
+char DEBUG_uart_buf[630]; 
 
 static dwt_config_t config =
 {
