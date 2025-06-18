@@ -10,10 +10,10 @@
 
 
 
-extern char uart_buf[];
+extern char DEBUG_uart_buf[];
 
 #define DEBUG_transmit_fmt(fmt, ...) \
-  sprintf(uart_buf, "%s:%d: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); HAL_UART_Transmit(&huart1, (uint8_t*) uart_buf+68, strlen(uart_buf+68), 100)
+  sprintf(DEBUG_uart_buf, "%s:%d: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); HAL_UART_Transmit(&huart1, (uint8_t*) DEBUG_uart_buf+68, strlen(DEBUG_uart_buf+68), 100)
   
 #define DEBUG_transmit_str(str) DEBUG_transmit_fmt("%s", str)
 
