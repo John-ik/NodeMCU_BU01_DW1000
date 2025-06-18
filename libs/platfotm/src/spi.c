@@ -5,7 +5,7 @@
 
 #include "string.h"
 
-#define DEBUG_UART_TRANSMIT
+// #define DEBUG_UART_TRANSMIT
 #include "debug.h"
 
 
