@@ -734,7 +734,7 @@ int main(void)
     }
     DEBUG_transmit_fmt("BEFORE STEP: event = %s; state = %s; Status_reg = %u", showEvent(event), showState(state), status_reg);
     step(event);
-    DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; delay = %u", showState(state), debug_var, request_to_response_delay);
+    DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; delay = %u; status = %u", showState(state), debug_var, request_to_response_delay, dwt_read32bitreg(SYS_STATUS_ID));
   }
   /* USER CODE END 3 */
 }
