@@ -601,17 +601,20 @@ int main(void)
   DEBUG_transmit_str("INITED");
 
 
-  // // set TX/RX leds
-  // {
-  //   dwt_on_deboundsclock();
-  //   dwt_blinking_enable();
-  //   dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
-  //   dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
-  //   dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
-  //   deca_sleep(10);
-  //   // blink all leds
-  //   dwt_blink_leds();
-  // }
+  // set TX/RX leds
+  {
+    // dwt_on_deboundsclock();
+    // dwt_blinking_enable();
+    // dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
+    // dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
+    // dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
+    // deca_sleep(10);
+
+    // blink all leds
+    // dwt_blink_leds();
+
+    dwt_setleds(1);
+  }
 
   // PRINT WHO IS WHO
   DEBUG_transmit_fmt("I am is a %s", IAMIS);
