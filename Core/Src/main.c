@@ -84,7 +84,7 @@ static dwt_config_t config =
     0,               /* Use non-standard SFD (Boolean) */
     DWT_BR_110K,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */
-    0 // (2048 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+    0 // (2048 + 1 + 64 - 8) // (2048 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
 /* Frames used in the ranging process. See NOTE 2 below. */
