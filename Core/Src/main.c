@@ -567,15 +567,14 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   spi_low_speed();
-  HAL_Delay(100);
+  // HAL_Delay(100);
   // reset_DW1000();
   // dwt_softreset();
   dwt_custom_softReset();
-  HAL_Delay(100);
+  // HAL_Delay(100);
   
   
   DEBUG_transmit_str("starting");
-  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
   DEBUG_transmit_fmt("0x%X", dwt_readdevid());
   while (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR){
     DEBUG_transmit_str("ERRORO");
