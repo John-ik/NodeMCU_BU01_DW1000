@@ -200,13 +200,13 @@ uint16 my_addr = COMPILE_ID; // Anchor
 
 // Indexing TAGs and Anchor from 1. 0 is special
 
-// #define TAG
+#define TAG
 #define TAG_ID 0x0F
 #define MASTER_TAG 0x0F
 #define MAX_SLAVE_TAG 0x02 
 #define SLAVE_TAG_START_INDEX 0x01
 
-#define ANCHOR
+// #define ANCHOR
 #define ANCHOR_MAX_NUM 1
 #define ANCHOR_IND 1  // 0 1 2
 //#define ANCHOR_IND ANCHOR_NUM
@@ -690,7 +690,7 @@ int main(void)
       event = toMsgEvent(status_reg, msg_buffer.type, 0);
       
       showMsg(uart_buf, msg_buffer);
-      DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamplo32());
+      DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamphi32());
     }else if (was_timer){
       event = EVENT_rxtimeout;
 
