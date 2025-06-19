@@ -30,22 +30,46 @@ ITStatus EXTI_GetITEnStatus(uint32_t EXTI_Line)
 }
 
 void led_signal (uint8_t signal){
-    if (signal > 3) return;
+    if (signal >= (1 << (NUM_LEDS-1))) return;
 
     switch (signal){
         case 0:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 0);
             HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
             HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
             break;
         case 1:
-            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 1);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
             HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
             break;
         case 2:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 0);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
+            HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
+            break;
+        case 3:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 1);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
+            HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 0);
+            break;
+        case 4:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 0);
             HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
             HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
             break;
-        case 3:
+        case 5:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 1);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 0);
+            HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
+            break;
+        case 6:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 0);
+            HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
+            HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
+            break;
+        case 7:
+            HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 1);
             HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, 1);
             HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, 1);
             break;

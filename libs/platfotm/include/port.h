@@ -23,6 +23,8 @@
 
 // -------------------- CONSTS --------------------
 
+#define NUM_LEDS 3
+
 // -------------------- PLATFORM SPECIFIC API --------------------
 
 ITStatus EXTI_GetITEnStatus(uint32_t EXTI_Line);
