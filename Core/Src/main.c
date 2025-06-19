@@ -46,6 +46,7 @@
 #include "stdio.h"
 
 #define DEBUG_UART_TRANSMIT
+// #define DEBUG_USB_TRANSMIT
 #include "debug.h"
 
 /* USER CODE END Includes */
