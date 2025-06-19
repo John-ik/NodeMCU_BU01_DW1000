@@ -517,7 +517,17 @@ void step(MsgEvent event){
     case STATE_Pull_one:
       switch(event){
         case MSG_RESP_ONE: // in STATE_Pull_one
-          DEBUG_transmit_str("resp_one");
+          
+          uint32 req_tx_ts = dwt_readtxtimestamphi32();
+          uint32 ans_rx_ts = dwt_readrxtimestamphi32();
+          uint32 ans_tx_ts = msg_buffer.data.resp_one.resp_tx_ts;
+          uint32 req_rx_ts = msg_buffer.data.resp_one.pull_rx_ts;
+
+          float time = (float) ((ans_rx_ts - req_tx_ts) - (ans_tx_ts - req_rx_ts)) / 2;
+          float dist = time * SPEED_OF_LIGHT / (128 * 499.2 * 1000000);
+          DEBUG_transmit_fmt("req_tx = %u, req_rx = %u, ans_tx = %u, ans_rx = %u, dist: %f m",
+                              req_tx_ts,   req_rx_ts,   ans_tx_ts,   ans_rx_ts,   dist);
+
           toReceive();
           state = STATE_Receive; // state mutate
           return;
