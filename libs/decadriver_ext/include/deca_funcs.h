@@ -12,6 +12,9 @@
 void dwt_custom_softReset();
 void softreset_receiver();
 
+uint64_t get_rx_ts();
+uint64_t get_tx_ts();
+
 
 // -------------------- DEPRECATED --------------------
 /* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */

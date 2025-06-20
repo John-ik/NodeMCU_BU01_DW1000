@@ -36,6 +36,13 @@ void softreset_receiver(){
 }
 
 
+uint64_t get_rx_ts(){
+    return (uint64_t) (dwt_readrxtimestamphi32() << 8) | (dwt_readrxtimestamplo32() & 0xff);
+}
+
+uint64_t get_tx_ts(){
+    return (uint64_t) (dwt_readtxtimestamphi32() << 8) | (dwt_readtxtimestamplo32() & 0xff);
+}
 
 // -------------------- DEPRECATED --------------------
 
@@ -67,7 +74,7 @@ uint64 get_systime_u64(void){
  * @fn get_tx_timestamp_u64()
  *
  * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and tx!
  *
  * @param  none
  *
