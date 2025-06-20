@@ -88,20 +88,38 @@ extern MacMessage error_tx_msg;
     *(out + i++) = what & 0xFF
 
 #define WRITEMSG2BYTES_2(out, what, i) \
-    *(out + i++) = (uint8)((what & 0xFF00) >> 8); *(out + i++) = what & 0xFF
+    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
+    *(out + i++) = what & 0xFF
 
 #define WRITEMSG2BYTES_4(out, what, i) \
-    *(out + i++) = (uint8)((what & 0xFF000000) >> 24); *(out + i++) = (uint8)((what & 0xFF0000)>>16); \
-    *(out + i++) = (uint8)((what & 0xFF00) >> 8); *(out + i++) = what & 0xFF
+    *(out + i++) = (uint8)((what & 0xFF000000) >> 24); \
+    *(out + i++) = (uint8)((what & 0xFF0000) >> 16); \
+    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
+    *(out + i++) = what & 0xFF
 
+#define WRITEMSG2BYTES_5(out, what, i) \
+    *(out + i++) = (uint8)((what & 0xFF00000000) >> 32); \
+    *(out + i++) = (uint8)((what & 0xFF000000) >> 24); \
+    *(out + i++) = (uint8)((what & 0xFF0000)>> 16); \
+    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
+    *(out + i++) = what & 0xFF
 
 uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]);
 
-#define READBYTES2MSG_1(input, i) (input[i++])
-#define READBYTES2MSG_2(input, i) ((input[i] << 8) | (input[i+1])); i += 2
-#define READBYTES2MSG_4(input, i) ((input[i] << 16) | (input[i+1] << 8) | (input[i+2]) | (input[i+3])); i += 4
-//TODO: for timestamps
-//#define READBYTES2MSG_5
+#define READBYTES2MSG_1(input, i) \
+    (input[i++])
+
+#define READBYTES2MSG_2(input, i) \
+    ((input[i] << 8) | (input[i+1])); \
+    i += 2
+
+#define READBYTES2MSG_4(input, i) \
+    ((input[i] << 24) | (input[i+1] << 16) | (input[i+2] << 8) | (input[i+3])); \
+    i += 4
+
+#define READBYTES2MSG_5(input, i) \
+    ((input[i] << 32) |(input[i+1] << 24) | (input[i+2] << 16) | (input[i+3] << 8) | (input[i+4])); \
+    i += 5
 
 MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len);
 
