@@ -37,6 +37,7 @@
 #include "mac.h"
 #include "deca_leds.h"
 #include "messages.h"
+#include "deca_funcs.h"
 #include "event.h"
 
 #include "port.h"
@@ -49,6 +50,7 @@
 // #define DEBUG_USB_TRANSMIT
 #include "debug.h"
 
+#include "config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,11 +60,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-/* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
-#define TX_ANT_DLY 16436
-#define RX_ANT_DLY 16436
-// #define TX_ANT_DLY 0
-// #define RX_ANT_DLY 32950
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -76,19 +74,6 @@
 char uart_buf[512]; 
 char DEBUG_uart_buf[630]; 
 
-static dwt_config_t config =
-{
-    5,               /* Channel number. */
-    DWT_PRF_16M,     /* Pulse repetition frequency. */
-    DWT_PLEN_2048,   /* Preamble length. */
-    DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
-    4,               /* TX preamble code. Used in TX only. */
-    4,               /* RX preamble code. Used in RX only. */
-    0,               /* Use non-standard SFD (Boolean) */
-    DWT_BR_110K,     /* Data rate. */
-    DWT_PHRMODE_STD, /* PHY header mode. */
-    0 // (2048 + 1 + 64 - 8) // (2048 + 1 + 64 - 8) /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
-};
 
 /* Frames used in the ranging process. See NOTE 2 below. */
 
@@ -105,6 +90,7 @@ static MacMessage resp_one_msg = {
 static uint8 tx_buffer[MSG_MAX_LEN];
 static uint8 rx_buffer[MSG_MAX_LEN];
 static MacMessage msg_buffer;
+
 /*
 MAC
 MSG:
@@ -117,26 +103,11 @@ MSG:
 
   n-2,n-1: FCS - CRC (not for user. let with zeros)
 */
-static uint8 poll_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_PULL, 0, 0};
-static uint8 resp_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_RESPONSE, 0x02, 0, 0, 0, 0};
-static uint8 final_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 distance_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_DISTANCE, 0, 0,0, 0, 0};
+uint8 poll_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_PULL, 0, 0};
+uint8 resp_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_RESPONSE, 0x02, 0, 0, 0, 0};
+uint8 final_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8 distance_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_DISTANCE, 0, 0,0, 0, 0};
 
-/* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
-#define ALL_MSG_COMMON_LEN 10
-/* Index to access some of the fields in the frames involved in the process. */
-#define ALL_MSG_SEQ_NUM 2
-#define ALL_MSG_TARGET 3
-#define ALL_MSG_TYPE    9
-#define FINAL_MSG_POLL_TX_TS_IDX 10
-#define FINAL_MSG_RESP_RX_TS_IDX 14
-#define FINAL_MSG_FINAL_TX_TS_IDX 18
-#define FINAL_MSG_TS_LEN 4
-#define ANGLE_MSG_IDX 10
-#define LOCATION_FLAG_IDX 11
-#define LOCATION_INFO_LEN_IDX 12
-#define LOCATION_INFO_START_IDX 13
-#define ANGLE_MSG_MAX_LEN 30
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -151,240 +122,21 @@ static uint8 frame_seq_nb_semaphore = 0;
 /* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
 static uint32 status_reg = 0;
 
-/* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
- * 1 uus = 512 / 499.2 ? and 1 ? = 499.2 * 128 dtu. */
-#define UUS_TO_DWT_TIME 65536
-
-/* Delay between frames, in UWB microseconds. See NOTE 4 below. */
-/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
- * frame length of approximately 2.46 ms with above configuration. */
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2600
-/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-#define RESP_TX_TO_FINAL_RX_DLY_UUS 500
-/* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 3300
-
-
-/* Delay between frames, in UWB microseconds. See NOTE 4 below. */
-/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
-#define POLL_TX_TO_RESP_RX_DLY_UUS 50
-/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
- * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 2800 //2700 will fail
-/* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 2700
-
-
-#define REQUEST_TO_RESPONSE_DELAY 0
 static uint16 request_to_response_delay = 100; 
 
-/* Timestamps of frames transmission/reception.
- * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
-typedef signed long long int64;
-typedef unsigned long long uint64;
-
-/* Speed of light in air, in metres per second. */
-#ifndef SPEED_OF_LIGHT
-#define SPEED_OF_LIGHT 299702547
-#endif
 
 static int debug_var;
 
-/*
- new ID system
- addr 0xA*** - Anchor
- addr 0xB*** - Tag
-*/
-#define MY_PAN_ID 0x0010 // ID of network
-uint16 my_addr = COMPILE_ID; // Anchor
-
-// Indexing TAGs and Anchor from 1. 0 is special
-
-#define TAG
-#define TAG_ID 0x0F
-#define MASTER_TAG 0x0F
-#define MAX_SLAVE_TAG 0x02 
-#define SLAVE_TAG_START_INDEX 0x01
-
-// #define ANCHOR
-#define ANCHOR_MAX_NUM 1
-#define ANCHOR_IND 1  // 0 1 2
-//#define ANCHOR_IND ANCHOR_NUM
-
-#ifdef TAG
-  char IAMIS[] = "TAG";
-#endif
-#ifdef ANCHOR
-  char IAMIS[] = "ANCHOR";
-#endif
-#ifdef TAG
-  #ifdef ANCHOR
-    #error "WHO AM I ???"
-  #endif
-#endif
-#ifndef TAG
-  #ifndef ANCHOR
-    #error "WHO AM I ???"
-  #endif
-#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-static uint64 get_tx_timestamp_u64(void);
-static uint64 get_rx_timestamp_u64(void);
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
-static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void dwt_custom_softReset() {
-	uint8_t pmscctrl0[PMSC_CTRL0_LEN];
-	dwt_readfromdevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
-	pmscctrl0[0] = 0x01;
-	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
-	pmscctrl0[3] = 0x00;
-	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
-	deca_sleep(10);
-	pmscctrl0[0] = 0x00;
-	pmscctrl0[3] = 0xF0;
-	dwt_writetodevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
-  deca_sleep(10);
-}
-#define TX_PGDELAY_CH5 0xC5
-
-void configureTXPower(dwt_txconfig_t *config){
-    config->PGdly = TX_PGDELAY_CH5;
-    config->power = 0x1F1F1F1F;
-    dwt_configuretxrf(config);
-}
-
-/**
- * @brief get systime in 64-bit 
- *        dwt return systime 40-bit value in 5 bytes
- * @return 40-bit systime in 64-bit
- */
-static uint64 get_systime_u64(void){
-  uint8 buf[10];
-  uint64 time = 0;
-  dwt_readsystime(buf);
-  for (int8 i = 4; i >= 0; i--){
-    time <<= 8;
-    time |= buf[i];
-  }
-  return time;
-}
-
-/**
- * @brief softreset receiver-only
- * @details reg 0x36:00 - 7.2.50.1
- */
-void softreset_receiver(){
-  uint8 buf = 0;
-
-  dwt_readfromdevice(PMSC_ID, 0, 1, &buf);
-  buf = (buf & 0x03) | 0x01; // set SYSCLKS to 01
-  dwt_writetodevice(PMSC_ID, 0, 1, &buf);
-
-  dwt_readfromdevice(PMSC_ID, 0x3, 1, &buf);
-  buf &= 0xEF; // clear only bit 28 to reset only receiver
-  dwt_writetodevice(PMSC_ID, 0x3, 1, &buf); 
-
-  buf &= 0x1F; // set only bit 28 to reset only receiver
-  dwt_writetodevice(PMSC_ID, 0x3, 1, &buf); 
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 get_tx_timestamp_u64(void)
-{
-    uint8 ts_tab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_rx_timestamp_u64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 get_rx_timestamp_u64(void)
-{
-    uint8 ts_tab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_get_ts()
- *
- * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
- *        significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to read
- *         ts  timestamp value
- *
- * @return none
- */
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts)
-{
-    int i;
-    *ts = 0;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++)
-    {
-        *ts += ts_field[i] << (i * 8);
-    }
-}
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_set_ts()
- *
- * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
- *        message, the least significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
- */
-static void final_msg_set_ts(uint8 *ts_field, uint64 ts)
-{
-    int i;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++)
-    {
-        ts_field[i] = (uint8) ts;
-        ts >>= 8;
-    }
-}
-
 /*! @brief 
  @param[in] msg MacMessage
  @param[in] tx_mode pass to `dwt_starttx`
