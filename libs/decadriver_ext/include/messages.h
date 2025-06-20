@@ -1,5 +1,6 @@
 #pragma once
 
+#include "stdint.h"
 #include "stdio.h"
 
 #include "deca_types.h"
@@ -33,8 +34,8 @@ MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext);
 typedef union {
     uint8 _empty;
     struct {
-        uint32 pull_rx_ts;
-        uint32 resp_tx_ts;
+        uint64_t pull_rx_ts;
+        uint64_t resp_tx_ts;
     } resp_one;
 
     /**

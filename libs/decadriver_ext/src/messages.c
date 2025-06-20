@@ -24,8 +24,8 @@ uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]){
     WRITEMSG2BYTES_1(out, msg.type, i);
     switch (msg.type){
         case MSG_RESP_ONE:
-            WRITEMSG2BYTES_4(out, msg.data.resp_one.pull_rx_ts, i);
-            WRITEMSG2BYTES_4(out, msg.data.resp_one.resp_tx_ts, i);
+            WRITEMSG2BYTES_5(out, msg.data.resp_one.pull_rx_ts, i);
+            WRITEMSG2BYTES_5(out, msg.data.resp_one.resp_tx_ts, i);
             break;
 
         case MSG_PULL_ONE:
@@ -54,8 +54,8 @@ MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len){
     msg.type = READBYTES2MSG_1(input, i);
     switch(msg.type){
         case MSG_RESP_ONE:
-            msg.data.resp_one.pull_rx_ts = READBYTES2MSG_4(input, i);
-            msg.data.resp_one.resp_tx_ts = READBYTES2MSG_4(input, i);
+            msg.data.resp_one.pull_rx_ts = READBYTES2MSG_5(input, i);
+            msg.data.resp_one.resp_tx_ts = READBYTES2MSG_5(input, i);
             break;
         case MSG_PULL_ONE:
             break;
@@ -107,9 +107,11 @@ void showMsg(char* str, MacMessage msg){
         case MSG_PULL_ONE:
             break;
         case MSG_RESP_ONE:
-            sprintf(data_buf,   "\tpull_rx_ts = %u\n"
-                                "\tresp_tx_ts = %u",
-                msg.data.resp_one.pull_rx_ts, msg.data.resp_one.resp_tx_ts);
+            sprintf(data_buf,   "\tpull_rx_ts = 0x%lX%lX\n"
+                                "\tresp_tx_ts = 0x%lX%lX",
+                (uint32_t) msg.data.resp_one.pull_rx_ts >> 8, (uint32_t) msg.data.resp_one.pull_rx_ts & 0xff,
+                (uint32_t) msg.data.resp_one.resp_tx_ts >> 8, (uint32_t) msg.data.resp_one.resp_tx_ts & 0xff
+            );
             break;
         case MSG_ERROR_RX:
             sprintf(data_buf,   "\trx_code = 0x%X"
