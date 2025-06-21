@@ -35,6 +35,9 @@ void softreset_receiver(){
   dwt_writetodevice(PMSC_ID, 0x3, 1, &buf); 
 }
 
+uint64_t get_sys_ts(){
+    return (uint64_t) (dwt_readsystimestamphi32() << 8); // 9 lowers bits always zero -> USER MANUAL 7.2.8
+}
 
 uint64_t get_rx_ts(){
     return (uint64_t) (dwt_readrxtimestamphi32() << 8) | (dwt_readrxtimestamplo32() & 0xff);
