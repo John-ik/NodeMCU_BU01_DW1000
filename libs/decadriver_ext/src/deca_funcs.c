@@ -36,15 +36,15 @@ void softreset_receiver(){
 }
 
 uint64_t get_sys_ts(){
-    return (uint64_t) (dwt_readsystimestamphi32() << 8); // 9 lowers bits always zero -> USER MANUAL 7.2.8
+    return (uint64_t) (dwt_readsystimestamphi32() >> 8); // 9 lowers bits always zero -> USER MANUAL 7.2.8
 }
 
 uint64_t get_rx_ts(){
-    return (uint64_t) (dwt_readrxtimestamphi32() << 8) | (dwt_readrxtimestamplo32() & 0xff);
+    return (uint64_t) (dwt_readrxtimestamphi32() >> 8) | (dwt_readrxtimestamplo32() & 0xff);
 }
 
 uint64_t get_tx_ts(){
-    return (uint64_t) (dwt_readtxtimestamphi32() << 8) | (dwt_readtxtimestamplo32() & 0xff);
+    return (uint64_t) (dwt_readtxtimestamphi32() >> 8) | (dwt_readtxtimestamplo32() & 0xff);
 }
 
 // -------------------- DEPRECATED --------------------
