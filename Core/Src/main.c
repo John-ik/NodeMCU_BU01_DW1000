@@ -122,7 +122,7 @@ static uint8 frame_seq_nb_semaphore = 0;
 /* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
 static uint32 status_reg = 0;
 
-static uint16 request_to_response_delay = 100; 
+static uint16 request_to_response_delay = 10; 
 
 
 static int debug_var;
@@ -152,6 +152,8 @@ int sendtx(MacMessage msg, uint8 tx_mode){
   if (msg.type == MSG_ERROR_RX || msg.type == MSG_ERROR_TX)
     return -2;
 
+  led_signal(msg.seq_num & 7);
+
   dwt_writetxdata(frame_len, tx_buffer, 0);
   dwt_writetxfctrl(frame_len, 0);
 
@@ -164,7 +166,7 @@ uint16 recieverx(){
     dwt_readrxdata(rx_buffer, frame_len, 0);
 
     msg_buffer = bytes2msg(rx_buffer, frame_len);
-    
+    led_signal(msg_buffer.seq_num & 7);
     // dwt_readfromdevice(RX_TIME_ID, 0, 14, rx_buffer);
     // char* uart_buf_ptr = uart_buf; 
     // for (size_t i = 0; i < 14; i++){
@@ -218,12 +220,13 @@ void toReceiveInTime(uint16 time){
 
 void step(MsgEvent event){
   uint64 pull_rx_ts, resp_tx_time;
+  uint64 req_tx_ts, ans_rx_ts, ans_tx_ts, req_rx_ts;
 
   switch(state){
     case STATE_Receive:
       switch(event){
         case EVENT_initiate_pull_one: // in STATE_Receive
-          led_signal(2);
+          // led_signal(2);
 
           pull_one_msg.seq_num = frame_seq_nb++;
           pull_one_msg.dest_pan  = MY_PAN_ID;
@@ -236,10 +239,10 @@ void step(MsgEvent event){
           return;
 
         case MSG_PULL_ONE: // in STATE_Receive
-          led_signal(3);
-          pull_rx_ts = dwt_readrxtimestamphi32() << 8;
-          resp_tx_time = (pull_rx_ts + (request_to_response_delay * UUS_TO_DWT_TIME));
-          dwt_setdelayedtrxtime((uint32)(resp_tx_time >> 8)); 
+          // led_signal(3);
+          pull_rx_ts = get_rx_ts();
+          resp_tx_time = (pull_rx_ts + (2800 * UUS_TO_DWT_TIME));
+          dwt_setdelayedtrxtime((uint32) (resp_tx_time) >> 8); 
           //? set rx timreout and rxaftertxdelay
 
           // uint64 resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
@@ -247,12 +250,12 @@ void step(MsgEvent event){
           resp_one_msg.dest_addr = msg_buffer.src_addr;
           resp_one_msg.dest_pan  = MY_PAN_ID;
           resp_one_msg.src_addr  = my_addr;
-          resp_one_msg.data.resp_one.pull_rx_ts = (uint32)pull_rx_ts;
-          resp_one_msg.data.resp_one.resp_tx_ts = (uint32)resp_tx_time; // + TX_ANT_DLY
+          resp_one_msg.data.resp_one.pull_rx_ts = pull_rx_ts;
+          resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_time; // + TX_ANT_DLY
 
           int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
           if (err == DWT_ERROR) // correct delay
-            request_to_response_delay += 100;
+            request_to_response_delay += 10;
           dwt_rxenable(0);
           // DEBUG_transmit_fmt("debug: %X00, %X00, %X00", (uint32)pull_rx_ts >> 8, (uint32)resp_tx_time >> 8, (uint32)debug_var >> 8);
           showMsg(uart_buf, resp_one_msg);
@@ -269,16 +272,16 @@ void step(MsgEvent event){
     case STATE_Pull_one:
       switch(event){
         case MSG_RESP_ONE: // in STATE_Pull_one
-          
-          uint32 req_tx_ts = dwt_readtxtimestamphi32();
-          uint32 ans_rx_ts = dwt_readrxtimestamphi32();
-          uint32 ans_tx_ts = msg_buffer.data.resp_one.resp_tx_ts;
-          uint32 req_rx_ts = msg_buffer.data.resp_one.pull_rx_ts;
+          req_tx_ts = get_tx_ts();
+          ans_rx_ts = get_rx_ts();
+          ans_tx_ts = msg_buffer.data.resp_one.resp_tx_ts;
+          req_rx_ts = msg_buffer.data.resp_one.pull_rx_ts;
 
           float time = (float) ((ans_rx_ts - req_tx_ts) - (ans_tx_ts - req_rx_ts)) / 2;
           float dist = time * SPEED_OF_LIGHT / (128 * 499.2 * 1000000);
-          DEBUG_transmit_fmt("req_tx = %u, req_rx = %u, ans_tx = %u, ans_rx = %u, dist: %f m",
-                              req_tx_ts,   req_rx_ts,   ans_tx_ts,   ans_rx_ts,   dist);
+          DEBUG_transmit_fmt("frame_seq_nb = %u\nreq_tx = %f, req_rx = %f, ans_tx = %f, ans_rx = %f, dist: %f m",
+                  frame_seq_nb - 1,    
+                  (float) req_tx_ts, (float) req_rx_ts, (float) ans_tx_ts, (float) ans_rx_ts, dist);
 
           toReceive();
           state = STATE_Receive; // state mutate
@@ -441,7 +444,7 @@ int main(void)
     }
 
 
-    led_signal(1);
+    // led_signal(1);
     MyEvents event = 0;
     if (STATUS_OK(status_reg)){
       // clear good bits
@@ -500,7 +503,9 @@ int main(void)
       event = toMsgEvent(status_reg, 0, 0);
       // }
     }
-    DEBUG_transmit_fmt("BEFORE STEP: event = %s; state = %s; Status_reg = %u", showEvent(event), showState(state), status_reg);
+    DEBUG_transmit_fmt("BEFORE STEP: event = %s; state = %s; Status_reg = %u; seq = %u",
+        showEvent(event), showState(state), status_reg, frame_seq_nb
+    );
     step(event);
     DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; delay = %u; status = %u", showState(state), debug_var, request_to_response_delay, dwt_read32bitreg(SYS_STATUS_ID));
   }
