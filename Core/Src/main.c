@@ -388,7 +388,7 @@ int main(void)
   }
 
   // PRINT WHO IS WHO
-  DEBUG_transmit_fmt("I am is a %s", IAMIS);
+  DEBUG_transmit_fmt("I am a %s", whoami);
 
   // Confifure filtering
   // dwt_enableframefilter(DWT_FF_DATA_EN);

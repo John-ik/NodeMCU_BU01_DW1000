@@ -22,10 +22,10 @@ uint16 my_addr = COMPILE_ID; // Anchor
 //#define ANCHOR_IND ANCHOR_NUM
 
 #ifdef TAG
-  char IAMIS[] = "TAG";
+  char whoami[] = "TAG";
 #endif
 #ifdef ANCHOR
-  char IAMIS[] = "ANCHOR";
+  char whoami[] = "ANCHOR";
 #endif
 #ifdef TAG
   #ifdef ANCHOR
