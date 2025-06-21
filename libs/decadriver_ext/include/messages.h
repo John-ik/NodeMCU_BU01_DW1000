@@ -119,7 +119,7 @@ uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]);
     i += 4
 
 #define READBYTES2MSG_5(input, i) \
-    ((input[i] << 32) |(input[i+1] << 24) | (input[i+2] << 16) | (input[i+3] << 8) | (input[i+4])); \
+    (((uint64_t) input[i] << 32) |(input[i+1] << 24) | (input[i+2] << 16) | (input[i+3] << 8) | (input[i+4])); \
     i += 5
 
 MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len);
