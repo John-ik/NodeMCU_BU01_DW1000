@@ -376,14 +376,14 @@ int main(void)
   {
     // dwt_on_deboundsclock();
     // dwt_blinking_enable();
-    // dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT);
     // dwt_gpio_mode(GPIO_RXLED, MODE_OUTPUT);
     // dwt_gpio_mode(GPIO_TXLED, MODE_OUTPUT);
     // deca_sleep(10);
-
+    
     // blink all leds
     // dwt_blink_leds();
-
+    
+    dwt_gpio_mode(GPIO_RXOKLED, MODE_OUTPUT); // dwt_setleds enable only TX/RX
     dwt_setleds(1);
   }
 
