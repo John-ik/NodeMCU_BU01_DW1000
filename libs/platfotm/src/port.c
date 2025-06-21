@@ -30,7 +30,7 @@ ITStatus EXTI_GetITEnStatus(uint32_t EXTI_Line)
 }
 
 void led_signal (uint8_t signal){
-    if (signal >= (1 << (NUM_LEDS-1))) return;
+    if (signal >= (1 << NUM_LEDS)) return;
     switch (signal){
         case 0:
             HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, 1);
