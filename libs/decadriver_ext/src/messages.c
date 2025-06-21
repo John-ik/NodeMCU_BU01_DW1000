@@ -107,10 +107,10 @@ void showMsg(char* str, MacMessage msg){
         case MSG_PULL_ONE:
             break;
         case MSG_RESP_ONE:
-            sprintf(data_buf,   "\tpull_rx_ts = 0x%lX%lX\n"
-                                "\tresp_tx_ts = 0x%lX%lX",
-                (uint32_t) msg.data.resp_one.pull_rx_ts >> 8, (uint32_t) msg.data.resp_one.pull_rx_ts & 0xff,
-                (uint32_t) msg.data.resp_one.resp_tx_ts >> 8, (uint32_t) msg.data.resp_one.resp_tx_ts & 0xff
+            sprintf(data_buf,   "\tpull_rx_ts = 0x%lX%02X\n"
+                                "\tresp_tx_ts = 0x%lX%02X",
+                (uint32_t) msg.data.resp_one.pull_rx_ts >> 8, (uint8_t) msg.data.resp_one.pull_rx_ts & 0xff,
+                (uint32_t) msg.data.resp_one.resp_tx_ts >> 8, (uint8_t) msg.data.resp_one.resp_tx_ts & 0xff
             );
             break;
         case MSG_ERROR_RX:
