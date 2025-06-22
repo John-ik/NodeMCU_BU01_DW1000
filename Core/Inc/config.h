@@ -1,31 +1,26 @@
 #pragma once
 
+// Indexing TAGs and Anchor from 1. 0 is special
+#define TAG
+// #define ANCHOR
+
+#define MY_PAN_ID 0x0010 // ID of network
+
 /*
  new ID system TODO:
  addr 0xA*** - Anchor
  addr 0xB*** - Tag
 */
-#define MY_PAN_ID 0x0010 // ID of network
-uint16 my_addr = COMPILE_ID; // Anchor
-
-// Indexing TAGs and Anchor from 1. 0 is special
-
-#define TAG
-#define TAG_ID 0x0F
-#define MASTER_TAG 0x0F
-#define MAX_SLAVE_TAG 0x02 
-#define SLAVE_TAG_START_INDEX 0x01
-
-// #define ANCHOR
-#define ANCHOR_MAX_NUM 1
-#define ANCHOR_IND 1  // 0 1 2
-//#define ANCHOR_IND ANCHOR_NUM
+#define ANCHOR_ID_marker 0xA000
+#define TAG_ID_marker    0xB000
 
 #ifdef TAG
   char whoami[] = "TAG";
+  uint16 my_addr = TAG_ID_marker | COMPILE_ID;
 #endif
 #ifdef ANCHOR
   char whoami[] = "ANCHOR";
+  uint16 my_addr = ANCHOR_ID_marker | COMPILE_ID;
 #endif
 #ifdef TAG
   #ifdef ANCHOR
@@ -37,6 +32,9 @@ uint16 my_addr = COMPILE_ID; // Anchor
     #error "WHO AM I ???"
   #endif
 #endif
+
+#define DEBUG_DWT_DIAG
+#define DEBUG_DWT_DIAG_TIMEOUT 10000
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16436
