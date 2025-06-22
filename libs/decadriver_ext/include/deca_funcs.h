@@ -58,6 +58,8 @@ extern dwt_irq_func_t _dwt_handler_hpdwarn;
 #define __DWT_IRQ_CALL_HANDLER(handler, status) if(handler) (*handler)(status);
 void dwt_irq();
 
+void dwt_showDiag(char* buf);
+
 // -------------------- DEPRECATED --------------------
 /* Length of the common part of the message (up to and including the function code, see NOTE 2 below). */
 #define ALL_MSG_COMMON_LEN 10
