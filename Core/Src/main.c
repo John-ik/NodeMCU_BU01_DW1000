@@ -476,6 +476,7 @@ int main(void)
   led_signal(0);
 
   dwt_setrxtimeout(0);
+  dwt_setautorxreenable(1); // auto re-enable RX after fail RX (except rxtimeout)
   dwt_rxenable(0); // start RX
   /* USER CODE END 2 */
 
