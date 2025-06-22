@@ -90,3 +90,10 @@ dwt_config_t config =
 #ifndef SPEED_OF_LIGHT
 #define SPEED_OF_LIGHT 299702547
 #endif
+
+
+
+
+// ==================== PROTOLOCS CONFIG ====================
+
+#define PULL_ONE_TIMEOUT_US 10000
