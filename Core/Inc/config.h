@@ -59,8 +59,10 @@ dwt_config_t config =
 };
 
 
-/* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
- * 1 uus = 512 / 499.2 ? and 1 ? = 499.2 * 128 dtu. */
+/** UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
+ * 1 uus = 512 / 499.2 ? and 1 ? = 499.2 * 128 dtu.
+ * ! number is arounded to easy optimize multiple 
+ */
 #define UUS_TO_DWT_TIME 65536
 
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
