@@ -84,15 +84,16 @@ char* showEvent(MyEvents event){
         case EVENT_none:              return "EVENT_none";
         case EVENT_rxtimeout:         return "EVENT_rxtimeout";
         case EVENT_initiate_pull_one: return "EVENT_initiate_pull_one";
+        case EVENT_pll_error:         return "EVENT_pll_error";
 
-        case MSG_PULL_ONE: return "EVENT_msg_pull_one";
-        case MSG_RESP_ONE: return "EVENT_msg_resp_one";
-        case MSG_PULL:     return "EVENT_msg_pull";
-        case MSG_RESPONSE: return "EVENT_msg_response";
-        case MSG_FINAL:    return "EVENT_msg_final";
-        case MSG_DISTANCE: return "EVENT_msg_distance";
-        case MSG_ERROR_RX: return "! EVENT_msg_ERROR_RX !";
-        case MSG_ERROR_TX: return "! EVENT_msg_ERROR_TX !";
+        case EVENT_msg_PULL_ONE: return "EVENT_msg_pull_one";
+        case EVENT_msg_RESP_ONE: return "EVENT_msg_resp_one";
+        case EVENT_msg_PULL:     return "EVENT_msg_pull";
+        case EVENT_msg_RESPONSE: return "EVENT_msg_response";
+        case EVENT_msg_FINAL:    return "EVENT_msg_final";
+        case EVENT_msg_DISTANCE: return "EVENT_msg_distance";
+        case EVENT_msg_ERROR_RX: return "! EVENT_msg_ERROR_RX !";
+        case EVENT_msg_ERROR_TX: return "! EVENT_msg_ERROR_TX !";
 
         default: 
             sprintf(default_str, default_str, event);

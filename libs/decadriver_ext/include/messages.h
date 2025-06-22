@@ -6,11 +6,32 @@
 #include "deca_types.h"
 #include "deca_regs.h"
 
+#define MSG_PULL_ONE 0x01
+#define MSG_RESP_ONE 0x02
+#define MSG_PULL     0x11
+#define MSG_RESPONSE 0x22
+#define MSG_FINAL    0x33
+#define MSG_DISTANCE 0x44
+#define MSG_ERROR_TX 0xF1
+#define MSG_ERROR_RX 0xF2
+
 typedef enum{
     EVENT_none = 0,
-    // EVENT_rxgood = 0x100, // If MSG_TYPE in event then its rxgood
+
+    EVENT_msg_PULL_ONE = MSG_PULL_ONE,
+    EVENT_msg_RESP_ONE = MSG_RESP_ONE,
+    EVENT_msg_PULL = MSG_PULL,
+    EVENT_msg_RESPONSE = MSG_RESPONSE,
+    EVENT_msg_FINAL = MSG_FINAL,
+    EVENT_msg_DISTANCE = MSG_DISTANCE,
+    EVENT_msg_ERROR_TX = MSG_ERROR_TX,
+    EVENT_msg_ERROR_RX = MSG_ERROR_RX,
+
     EVENT_rxtimeout = 0x200,
+
     EVENT_initiate_pull_one = 0x300,
+    
+    EVENT_pll_error = 0x500,
     // EVENT_timer
 } MyEvents;
 
@@ -22,14 +43,6 @@ MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext);
 #define MSG_DATA_MAX_LEN  24
 #define MSG_MAX_LEN (MSG_DATA_MAX_LEN + 12)
 
-#define MSG_PULL_ONE 0x01
-#define MSG_RESP_ONE 0x02
-#define MSG_PULL     0x11
-#define MSG_RESPONSE 0x22
-#define MSG_FINAL    0x33
-#define MSG_DISTANCE 0x44
-#define MSG_ERROR_TX 0xF1
-#define MSG_ERROR_RX 0xF2
 
 typedef union {
     uint8 _empty;
