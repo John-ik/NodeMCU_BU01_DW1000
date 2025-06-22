@@ -237,6 +237,7 @@ void step(MsgEvent event){
         case EVENT_initiate_pull_one: // in STATE_Receive
           // led_signal(2);
           toIdle();
+          dwt_setrxtimeout(PULL_ONE_TIMEOUT_US);
 
           pull_one_msg.seq_num = frame_seq_nb++;
           pull_one_msg.dest_pan  = MY_PAN_ID;
