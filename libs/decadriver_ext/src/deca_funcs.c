@@ -65,7 +65,7 @@ uint32 dwt_get_status(){
     return dwt_read32bitreg(SYS_STATUS_ID);
 }
 void dwt_reset_status(uint32 status){
-    dwt_write32bitreg(SYS_STATUS_ID, status);
+    dwt_write32bitreg(SYS_STATUS_ID, status & SYS_STATUS_MASK_32);
 }
 
 void dwt_irq(){
