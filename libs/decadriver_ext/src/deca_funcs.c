@@ -111,19 +111,19 @@ void dwt_showDiag(char* buf){
     dwt_deviceentcnts_t cntrs;
     dwt_readeventcounters(&cntrs);
     sprintf(buf,
-        "DIAG:\n"
-        "\tPHR er = %u"
-        "\tRSD er = %u"
-        "\tcrc good = %u"
-        "\tcrc bad = %u"
-        "\tframe filter reject = %u"
-        "\toverrun = %u"
-        "\tsfd timeout = %u"
-        "\tpreamble timeout = %u"
-        "\tRX timeout = %u"
-        "\tTX sent = %u"
-        "\tperiod/2 (big TX delay)= %u"
-        "\tshort TX delay = %u",
+        "DIAG: "
+        "PHR er = %u, "
+        "RSD er = %u, "
+        "crc good = %u, "
+        "crc bad = %u, "
+        "frame filter reject = %u, "
+        "overrun = %u, "
+        "sfd timeout = %u, "
+        "preamble timeout = %u, "
+        "RX timeout = %u, "
+        "TX sent = %u, "
+        "big delay = %u, "
+        "short delay = %u",
     cntrs.PHE, cntrs.RSL, cntrs.CRCG, cntrs.CRCB, cntrs.ARFE, cntrs.OVER, cntrs.SFDTO, cntrs.PTO, cntrs.RTO, cntrs.TXF, cntrs.HPW, cntrs.TXW
     );
 }
