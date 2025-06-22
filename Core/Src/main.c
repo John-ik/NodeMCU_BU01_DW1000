@@ -164,7 +164,6 @@ int sendtx(MacMessage msg, uint8 tx_mode){
 /**
  * @brief get MacMessage and place in `msg_buffer`
  */
-
 uint16 recieverx(){
   uint16 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
   if (frame_len <= MSG_MAX_LEN){
@@ -223,6 +222,11 @@ void toReceiveInTime(uint16 time){
   toReceive();
 }
 
+/// @brief Use before Transmit and config transmit
+void toIdle(){
+  dwt_forcetrxoff();
+}
+
 void step(MsgEvent event){
   uint64 pull_rx_ts, resp_tx_time;
   uint64 req_tx_ts, ans_rx_ts, ans_tx_ts, req_rx_ts;
@@ -232,6 +236,7 @@ void step(MsgEvent event){
       switch(event){
         case EVENT_initiate_pull_one: // in STATE_Receive
           // led_signal(2);
+          toIdle();
 
           pull_one_msg.seq_num = frame_seq_nb++;
           pull_one_msg.dest_pan  = MY_PAN_ID;
@@ -245,6 +250,8 @@ void step(MsgEvent event){
 
         case MSG_PULL_ONE: // in STATE_Receive
           // led_signal(3);
+          toIdle();
+
           pull_rx_ts = get_rx_ts();
           resp_tx_time = (pull_rx_ts + (2800 * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32) (resp_tx_time) >> 8); 
@@ -272,7 +279,7 @@ void step(MsgEvent event){
           toReceiveInTime(0);
           return;
       }
-      return;
+      return; // after switch(event) <-- STATE_Receive
 
     case STATE_Pull_one:
       switch(event){
@@ -298,7 +305,7 @@ void step(MsgEvent event){
           state = STATE_Receive; // state mutate
           return;
       }
-      return;
+      return; // <-- after switch(event) STATE_Pull_one
 
     default:
       return;
