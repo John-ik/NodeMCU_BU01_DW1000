@@ -4,7 +4,7 @@
   #define DEBUG_PRINT_ENABLE
 
   #include "usart.h"
-  #define Transmit(data_ptr) HAL_UART_Transmit(&huart1, (uint8_t*) data_ptr, strlen(data_ptr), 100)
+  #define Transmit(data_ptr) HAL_UART_Transmit(&huart1, (uint8_t*) data_ptr, strlen(data_ptr), 50)
 
 #endif
 #ifdef DEBUG_USB_TRANSMIT
