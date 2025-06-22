@@ -2706,6 +2706,7 @@ int dwt_starttx(uint8 mode)
         }
         else
         {
+        /*  //! IGNORE recomendation
             // I am taking DSHP set to Indicate that the TXDLYS was set too late for the specified DX_TIME.
             // Remedial Action - (a) cancel delayed send
             temp = (uint8)SYS_CTRL_TRXOFF; // This assumes the bit is in the lowest byte
@@ -2717,8 +2718,8 @@ int dwt_starttx(uint8 mode)
             // Clear the "auto TX to sleep" bit
             dwt_entersleepaftertx(0);
             dw1000local.wait4resp = 0;
-            retval = DWT_ERROR ; // Failed !
-
+            retval = checkTxOK ; // Failed !
+        */
         }
     }
     else
