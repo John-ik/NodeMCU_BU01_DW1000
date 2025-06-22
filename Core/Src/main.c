@@ -265,11 +265,8 @@ void step(MsgEvent event){
           resp_one_msg.data.resp_one.pull_rx_ts = pull_rx_ts;
           resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_time; // + TX_ANT_DLY
 
-          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-          if (err == DWT_ERROR) // correct delay
-            request_to_response_delay += 10;
-          dwt_rxenable(0);
-          // DEBUG_transmit_fmt("debug: %X00, %X00, %X00", (uint32)pull_rx_ts >> 8, (uint32)resp_tx_time >> 8, (uint32)debug_var >> 8);
+          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED);
+
           showMsg(uart_buf, resp_one_msg);
           DEBUG_transmit_fmt("sended: %s", uart_buf);
 
