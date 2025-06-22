@@ -70,41 +70,53 @@ void dwt_reset_status(uint32 status){
 
 void dwt_irq(){
     uint32 status = dwt_get_status();
+    uint32 status2reset = 0;
     
     if(status & DWT_IRQ_CPLOCK){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_cplock, status);
+        status2reset |= DWT_IRQ_CPLOCK;
     }
     if(status & DWT_IRQ_ESYNCR){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_cplock, status);
+        status2reset |= DWT_IRQ_ESYNCR;
     }
     if(status & DWT_IRQ_AAT){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_aat, status);
+        status2reset |= DWT_IRQ_AAT;
     }
     if(status & DWT_IRQ_SEND){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_send, status);
+        status2reset |= SYS_STATUS_ALL_TX ^ SYS_STATUS_AAT;
     }
     if(status & DWT_IRQ_RXFAILED){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxfailed, status);
+        status2reset |= DWT_IRQ_RXFAILED;
     }
     if(status & DWT_IRQ_RXOK){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxok, status);
+        status2reset |= SYS_STATUS_ALL_RX_GOOD;
     }
     if(status & DWT_IRQ_RXTIMEOUT){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxtimeout, status);
+        status2reset |= DWT_IRQ_RXTIMEOUT;
     }
     if(status & DWT_IRQ_RXOVERRRUN){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxoverrun, status);
+        status2reset |= DWT_IRQ_RXOVERRRUN;
     }
     if(status & DWT_IRQ_SLEEP2INIT){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_sleep2init, status);
+        status2reset |= DWT_IRQ_SLEEP2INIT;
     }
     if(status & DWT_IRQ_PLL_ERROR){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_pll_error, status);
+        status2reset |= DWT_IRQ_PLL_ERROR;
     }
     if(status & DWT_IRQ_HPDWARN){
         __DWT_IRQ_CALL_HANDLER(_dwt_handler_hpdwarn, status);
+        status2reset |= DWT_IRQ_HPDWARN;
     }
-    return;
+    dwt_reset_status(status2reset);
 }
 
 void dwt_showDiag(char* buf){

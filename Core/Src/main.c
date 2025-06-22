@@ -322,15 +322,12 @@ static uint8 flag_send = 0;
 void handler_send(uint32 status){
   UNUSED(status);
   flag_send = 1;
-
-  // TXFRS automatical clear on next transmit
 }
 
 static uint8 pll_err_counter = 0;
 static uint32 flag_pll_err = 0; // and save which pll issue
 void handler_pll_error(uint32 status){
   pll_err_counter++;
-  dwt_reset_status(DWT_IRQ_PLL_ERROR);
   flag_pll_err = status & DWT_IRQ_PLL_ERROR;
 }
 
@@ -339,20 +336,16 @@ void handler_rxok(uint32 status){
   UNUSED(status);
   recieverx();
   flag_rxok = 1;
-  // RXFCG automatical clear on next receive
 }
 
 static uint32 flag_rxfailed_status = 0;
 void handler_rxfailed(uint32 status){
-  dwt_reset_status(status & DWT_IRQ_RXFAILED);
   flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
 }
 
 static uint8 flag_rxtimeout = 0;
 void handler_rxtimeout(uint32 status){
   UNUSED(status);
-  led_signal(7);
-  dwt_reset_status(DWT_IRQ_RXTIMEOUT);
   flag_rxtimeout = 1;
 }
 
