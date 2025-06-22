@@ -124,8 +124,6 @@ static uint32 status_reg = 0;
 
 static uint16 request_to_response_delay = 10; 
 
-static uint8 was_sended = 0; 
-
 static int debug_var;
 
 /* USER CODE END PV */
@@ -207,6 +205,7 @@ char* showState(State state){
 
 /// @brief turn on RX
 void toReceive(){
+  dwt_setrxtimeout(0);
   dwt_rxenable(0);
 }
 
@@ -219,7 +218,7 @@ void toReceive(){
  */
 void toReceiveInTime(uint16 time){
   dwt_setrxtimeout(time);
-  toReceive();
+  dwt_rxenable(0);
 }
 
 /// @brief Use before Transmit and config transmit
@@ -319,46 +318,42 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
   }
 }
 
-MyEvents event = EVENT_none;
-
-// void handler_rxok(uint32 status){
-  
-// }
-// _dwt_handler_rxok = &handler_rxok;
-
+static uint8 flag_send = 0;
 void handler_send(uint32 status){
   UNUSED(status);
-  was_sended = 1;
+  flag_send = 1;
 
   // TXFRS automatical clear on next transmit
 }
 
 static uint8 pll_err_counter = 0;
-static uint32 last_pll_err = 0;
+static uint32 flag_pll_err = 0; // and save which pll issue
 void handler_pll_error(uint32 status){
   pll_err_counter++;
   dwt_reset_status(DWT_IRQ_PLL_ERROR);
-  last_pll_err = status & DWT_IRQ_PLL_ERROR;
-  event = EVENT_pll_error;
+  flag_pll_err = status & DWT_IRQ_PLL_ERROR;
 }
 
+static uint8 flag_rxok = 0;
 void handler_rxok(uint32 status){
   UNUSED(status);
   recieverx();
-  event = msg_buffer.type;
-
+  flag_rxok = 1;
   // RXFCG automatical clear on next receive
 }
 
-static uint32 last_rxfailed_status = 0;
+static uint32 flag_rxfailed_status = 0;
 void handler_rxfailed(uint32 status){
   dwt_reset_status(status & DWT_IRQ_RXFAILED);
-  last_rxfailed_status = status & DWT_IRQ_RXFAILED;
+  flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
 }
 
+static uint8 flag_rxtimeout = 0;
 void handler_rxtimeout(uint32 status){
   UNUSED(status);
-  event = EVENT_rxtimeout;
+  led_signal(7);
+  dwt_reset_status(DWT_IRQ_RXTIMEOUT);
+  flag_rxtimeout = 1;
 }
 
 /// assign dwt_handlers
@@ -498,54 +493,82 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    MyEvents event = EVENT_none;
+    static MyEvents saved_event = EVENT_none;
+
+    if (saved_event == EVENT_none){
+      #ifdef TAG
+        static uint32 timer_pull_one = 0; 
+        if (HAL_GetTick() - timer_pull_one > INITIATE_PULL_ONE_TIMEOUT_MS){
+          timer_pull_one = HAL_GetTick();
+          event = EVENT_initiate_pull_one;
+        }
+      #endif
+
+      #ifdef DEBUG_DWT_DIAG
+        static uint32 timer_diag = 0;
+        if (HAL_GetTick() - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
+          timer_diag = HAL_GetTick();
+          dwt_showDiag(uart_buf);
+          Transmit(uart_buf);
+          Transmit("\n");
+        }
+      #endif
+    }
+    
+    // flag handlers and saved event
+    if (flag_pll_err){
+      saved_event = event;
+      event = EVENT_pll_error;
+      flag_pll_err = 0;
+    }else if(flag_rxfailed_status){
+      //TODO:
+      flag_rxfailed_status = 0;
+    }else if(flag_rxok){
+      saved_event = event;
+      event = msg_buffer.type;
+      flag_rxok = 0;
+    }else if(flag_rxtimeout){
+      saved_event = event;
+      event = EVENT_rxtimeout;
+      flag_rxtimeout = 0;
+    }else if(flag_send){
+      flag_send = 0;
+    }else if(saved_event){
+      event = saved_event;
+      saved_event = EVENT_none;
+    }
+
     if (event){
-      DEBUG_transmit_fmt("BEFORE: event = %s; state = %s; status = 0x%X; seq = %u",
-        showEvent(event), showState(state), status_reg, frame_seq_nb
+      DEBUG_transmit_fmt("BEFORE: event = %s, saved_event = %s, state = %s, status = 0x%X, seq = %u",
+        showEvent(event), showEvent(saved_event), showState(state), dwt_get_status(), frame_seq_nb
       );
     }
 
-    if (EVENT_is(event, EVENTs_dwt)){ // Aka server event
+    { // Aka server event
       // EVENT_rxtimeout processing in step
 
       if (event == EVENT_pll_error){
-        if (last_pll_err & SYS_STATUS_CLKPLL_LL){
+        if (flag_pll_err & SYS_STATUS_CLKPLL_LL){
           DEBUG_transmit_fmt("!!! Clock PLL Losing Lock. №%u (common counter with RF_PLL_LL) !!!", pll_err_counter);
         }
-        if (last_pll_err & SYS_STATUS_RFPLL_LL){
+        if (flag_pll_err & SYS_STATUS_RFPLL_LL){
           DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u (common counter with CPLL_LL) !!!", pll_err_counter);
         }
       }
     }
 
-    if (EVENT_is(event, EVENTs_host)){ // Aka client event
+    { // Aka client event
 
     }
 
-    if (event && (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || event == EVENT_rxtimeout)){ // All for msg protocols
+    // All for msg protocols
+    if (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || (event == EVENT_rxtimeout)){
       step(event);
 
       DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; status = 0x%X", showState(state), debug_var, dwt_read32bitreg(SYS_STATUS_ID));
     }
-
-    event = EVENT_none;
-
-    #ifdef TAG
-      static uint32 timer_pull_one = 0; 
-      if (HAL_GetTick() - timer_pull_one > 5000){
-        timer_pull_one = HAL_GetTick();
-        event = EVENT_initiate_pull_one;
-      }
-    #endif
-
-    #ifdef DEBUG_DWT_DIAG
-      static uint32 timer_diag = 0;
-      if (HAL_GetTick() - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
-        timer_diag = HAL_GetTick();
-        dwt_showDiag(uart_buf);
-        Transmit(uart_buf);
-        Transmit("\n");
-      }
-    #endif
   }
   /* USER CODE END 3 */
 }

@@ -96,4 +96,6 @@ dwt_config_t config =
 
 // ==================== PROTOLOCS CONFIG ====================
 
+#define INITIATE_PULL_ONE_TIMEOUT_MS 5000
+
 #define PULL_ONE_TIMEOUT_US 10000
