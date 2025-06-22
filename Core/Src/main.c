@@ -329,9 +329,12 @@ void handler_send(uint32 status){
 }
 
 static uint8 pll_err_counter = 0;
+static uint32 last_pll_err = 0;
 void handler_pll_error(uint32 status){
   pll_err_counter++;
   dwt_reset_status(DWT_IRQ_PLL_ERROR);
+  last_pll_err = status & DWT_IRQ_PLL_ERROR;
+  event = EVENT_pll_error;
 }
 
 void handler_rxok(uint32 status){
@@ -473,9 +476,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-    
-    
+    if (event == EVENT_pll_error){
+      if (last_pll_err & SYS_STATUS_CLKPLL_LL){
+        DEBUG_transmit_fmt("!!! Clock PLL Losing Lock. №%u !!!", pll_err_counter);
+      }
+      if (last_pll_err & SYS_STATUS_RFPLL_LL){
+        DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u !!!", pll_err_counter);
+      }
+    }
 
     uint8 was_timer = 0;
     uint32 timer_timeout = 1000;
@@ -493,12 +501,6 @@ int main(void)
         if (was_timer)
           dwt_forcetrxoff(); // shutdown TX/RX
       #endif
-    }
-    if (status_reg & SYS_STATUS_CLKPLL_LL){
-      DEBUG_transmit_str("!!! Clock PLL Losing Lock. !!!");
-    }
-    if (status_reg & SYS_STATUS_RFPLL_LL){
-      DEBUG_transmit_str("!!! RF PLL Losing Lock. !!!");
     }
 
 
