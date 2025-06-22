@@ -2686,7 +2686,7 @@ int dwt_starttx(uint8 mode)
     if(mode & DWT_RESPONSE_EXPECTED)
     {
         temp = (uint8)SYS_CTRL_WAIT4RESP ; // Set wait4response bit
-        dwt_writetodevice(SYS_CTRL_ID,0,1,&temp) ;
+        // dwt_writetodevice(SYS_CTRL_ID,0,1,&temp) ; //! DW1000 USER MANUAL 7.2.15 --- When in use the WAIT4RESP bit must be set at the same time as the TXSTRT bit is set
         dw1000local.wait4resp = 1;
     }
 
