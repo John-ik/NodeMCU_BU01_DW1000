@@ -124,6 +124,7 @@ static uint32 status_reg = 0;
 
 static uint16 request_to_response_delay = 10; 
 
+static uint8 was_sended = 0; 
 
 static int debug_var;
 
@@ -159,6 +160,10 @@ int sendtx(MacMessage msg, uint8 tx_mode){
 
   return debug_var = dwt_starttx(tx_mode);
 }
+
+/**
+ * @brief get MacMessage and place in `msg_buffer`
+ */
 
 uint16 recieverx(){
   uint16 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
@@ -301,6 +306,56 @@ void step(MsgEvent event){
 }
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ STATE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// ============================== HANDLERS ==============================
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+  if (GPIO_Pin == IRQ_Pin){
+    dwt_irq();
+  }
+}
+
+MyEvents event = EVENT_none;
+
+// void handler_rxok(uint32 status){
+  
+// }
+// _dwt_handler_rxok = &handler_rxok;
+
+void handler_send(uint32 status){
+  UNUSED(status);
+  was_sended = 1;
+
+  // TXFRS automatical clear on next transmit
+}
+
+static uint8 pll_err_counter = 0;
+void handler_pll_error(uint32 status){
+  pll_err_counter++;
+  dwt_reset_status(DWT_IRQ_PLL_ERROR);
+}
+
+void handler_rxok(uint32 status){
+  UNUSED(status);
+  recieverx();
+  event = msg_buffer.type;
+
+  // RXFCG automatical clear on next receive
+}
+
+/// assign dwt_handlers
+void init_irq(){
+  _dwt_handler_send = &handler_send;
+  _dwt_handler_pll_error = &handler_pll_error;
+  _dwt_handler_rxok = &handler_rxok;
+
+  dwt_setinterrupt(
+    DWT_IRQ_SEND |
+    DWT_IRQ_PLL_ERROR |
+    DWT_IRQ_RXOK
+  , 1);
+}
+
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 /* USER CODE END 0 */
 
 /**
@@ -392,10 +447,14 @@ int main(void)
 
   // Confifure filtering
   // dwt_enableframefilter(DWT_FF_DATA_EN);
-  uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
-  DEBUG_transmit_fmt("Sys_cfg = 0x%X; Status = 0x%X", cfg, dwt_read32bitreg(SYS_STATUS_ID));
-
+  
   dwt_configeventcounters(1); // enalbe counters for diagnostics
+  
+  // enable IRQ
+  init_irq();
+  
+  uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
+  DEBUG_transmit_fmt("Sys_cfg = 0x%X; Status = 0x%X", cfg, dwt_get_status());
 
 
   // INITIAL STATE
@@ -414,7 +473,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    led_signal(0);
 
     
     

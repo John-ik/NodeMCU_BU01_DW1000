@@ -2,6 +2,20 @@
 
 #include "deca_sleep.h"
 
+
+dwt_irq_func_t _dwt_handler_cplock = NULL;
+dwt_irq_func_t _dwt_handler_esyncr = NULL;
+dwt_irq_func_t _dwt_handler_aat = NULL;
+dwt_irq_func_t _dwt_handler_send = NULL;
+dwt_irq_func_t _dwt_handler_rxfailed = NULL;
+dwt_irq_func_t _dwt_handler_rxok = NULL;
+dwt_irq_func_t _dwt_handler_rxtimeout = NULL;
+dwt_irq_func_t _dwt_handler_rxoverrun = NULL;
+dwt_irq_func_t _dwt_handler_sleep2init = NULL;
+dwt_irq_func_t _dwt_handler_pll_error = NULL;
+dwt_irq_func_t _dwt_handler_hpdwarn = NULL;
+
+
 void dwt_custom_softReset() {
 	uint8_t pmscctrl0[PMSC_CTRL0_LEN];
 	dwt_readfromdevice(PMSC_ID, PMSC_CTRL0_OFFSET, PMSC_CTRL0_LEN, pmscctrl0);
@@ -45,6 +59,52 @@ uint64_t get_rx_ts(){
 
 uint64_t get_tx_ts(){
     return (uint64_t) (dwt_readtxtimestamphi32() >> 8) | (dwt_readtxtimestamplo32() & 0xff);
+}
+
+uint32 dwt_get_status(){
+    return dwt_read32bitreg(SYS_STATUS_ID);
+}
+void dwt_reset_status(uint32 status){
+    dwt_write32bitreg(SYS_STATUS_ID, status);
+}
+
+void dwt_irq(){
+    uint32 status = dwt_get_status();
+    
+    if(status & DWT_IRQ_CPLOCK){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_cplock, status);
+    }
+    if(status & DWT_IRQ_ESYNCR){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_cplock, status);
+    }
+    if(status & DWT_IRQ_AAT){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_aat, status);
+    }
+    if(status & DWT_IRQ_SEND){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_send, status);
+    }
+    if(status & DWT_IRQ_RXFAILED){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxfailed, status);
+    }
+    if(status & DWT_IRQ_RXOK){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxok, status);
+    }
+    if(status & DWT_IRQ_RXTIMEOUT){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxtimeout, status);
+    }
+    if(status & DWT_IRQ_RXOVERRRUN){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_rxoverrun, status);
+    }
+    if(status & DWT_IRQ_SLEEP2INIT){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_sleep2init, status);
+    }
+    if(status & DWT_IRQ_PLL_ERROR){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_pll_error, status);
+    }
+    if(status & DWT_IRQ_HPDWARN){
+        __DWT_IRQ_CALL_HANDLER(_dwt_handler_hpdwarn, status);
+    }
+    return;
 }
 
 // -------------------- DEPRECATED --------------------
