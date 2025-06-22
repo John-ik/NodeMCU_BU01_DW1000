@@ -448,6 +448,7 @@ int main(void)
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
 
+  dwt_reset_status(SYS_STATUS_SLP2INIT | SYS_STATUS_CPLOCK);
   DEBUG_transmit_str("INITED");
 
 
