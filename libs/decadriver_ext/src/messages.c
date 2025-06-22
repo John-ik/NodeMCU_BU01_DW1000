@@ -82,10 +82,7 @@ char* showEvent(MyEvents event){
 
     switch(event){
         case EVENT_none:              return "EVENT_none";
-        case EVENT_rxtimeout:         return "EVENT_rxtimeout";
-        case EVENT_initiate_pull_one: return "EVENT_initiate_pull_one";
-        case EVENT_pll_error:         return "EVENT_pll_error";
-
+        
         case EVENT_msg_PULL_ONE: return "EVENT_msg_pull_one";
         case EVENT_msg_RESP_ONE: return "EVENT_msg_resp_one";
         case EVENT_msg_PULL:     return "EVENT_msg_pull";
@@ -94,6 +91,12 @@ char* showEvent(MyEvents event){
         case EVENT_msg_DISTANCE: return "EVENT_msg_distance";
         case EVENT_msg_ERROR_RX: return "! EVENT_msg_ERROR_RX !";
         case EVENT_msg_ERROR_TX: return "! EVENT_msg_ERROR_TX !";
+        
+        case EVENT_initiate_pull_one: return "EVENT_initiate_pull_one";
+        
+        case EVENT_rxtimeout:         return "EVENT_rxtimeout";
+        
+        case EVENT_pll_error:         return "EVENT_pll_error";
 
         default: 
             sprintf(default_str, default_str, event);
