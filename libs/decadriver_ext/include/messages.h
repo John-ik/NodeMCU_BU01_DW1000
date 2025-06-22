@@ -15,23 +15,30 @@
 #define MSG_ERROR_TX 0xF1
 #define MSG_ERROR_RX 0xF2
 
+#define EVENTs_msg    0x000
+#define EVENTs_custom 0x200
+#define EVENTs_host   0x400
+#define EVENTs_dwt    0x500
+
+#define EVENT_is(event, event_class) ((event & 0xff00) == event_class)
+
 typedef enum{
     EVENT_none = 0,
 
-    EVENT_msg_PULL_ONE = MSG_PULL_ONE,
-    EVENT_msg_RESP_ONE = MSG_RESP_ONE,
-    EVENT_msg_PULL = MSG_PULL,
-    EVENT_msg_RESPONSE = MSG_RESPONSE,
-    EVENT_msg_FINAL = MSG_FINAL,
-    EVENT_msg_DISTANCE = MSG_DISTANCE,
-    EVENT_msg_ERROR_TX = MSG_ERROR_TX,
-    EVENT_msg_ERROR_RX = MSG_ERROR_RX,
+    EVENT_msg_PULL_ONE = EVENTs_msg | MSG_PULL_ONE,
+    EVENT_msg_RESP_ONE = EVENTs_msg | MSG_RESP_ONE,
+    EVENT_msg_PULL     = EVENTs_msg | MSG_PULL,
+    EVENT_msg_RESPONSE = EVENTs_msg | MSG_RESPONSE,
+    EVENT_msg_FINAL    = EVENTs_msg | MSG_FINAL,
+    EVENT_msg_DISTANCE = EVENTs_msg | MSG_DISTANCE,
+    EVENT_msg_ERROR_TX = EVENTs_msg | MSG_ERROR_TX,
+    EVENT_msg_ERROR_RX = EVENTs_msg | MSG_ERROR_RX,
 
-    EVENT_rxtimeout = 0x200,
-
-    EVENT_initiate_pull_one = 0x300,
+    EVENT_initiate_pull_one = EVENTs_custom | 0x0,
     
-    EVENT_pll_error = 0x500,
+    EVENT_rxtimeout = EVENTs_host | 0x0,
+
+    EVENT_pll_error = EVENTs_dwt | 0x0,
     // EVENT_timer
 } MyEvents;
 
