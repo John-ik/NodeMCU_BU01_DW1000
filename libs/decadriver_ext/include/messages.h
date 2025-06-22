@@ -25,6 +25,8 @@
 typedef enum{
     EVENT_none = 0,
 
+    // ------------------------- MSG -------------------------
+
     EVENT_msg_PULL_ONE = EVENTs_msg | MSG_PULL_ONE,
     EVENT_msg_RESP_ONE = EVENTs_msg | MSG_RESP_ONE,
     EVENT_msg_PULL     = EVENTs_msg | MSG_PULL,
@@ -34,12 +36,18 @@ typedef enum{
     EVENT_msg_ERROR_TX = EVENTs_msg | MSG_ERROR_TX,
     EVENT_msg_ERROR_RX = EVENTs_msg | MSG_ERROR_RX,
 
+    // ------------------------- CUSTOM -------------------------
+
     EVENT_initiate_pull_one = EVENTs_custom | 0x0,
     
-    EVENT_rxtimeout = EVENTs_host | 0x0,
-
-    EVENT_pll_error = EVENTs_dwt | 0x0,
+    // ------------------------- HOST -------------------------
+    
     // EVENT_timer
+
+    // ------------------------- DWT -------------------------
+    
+    EVENT_rxtimeout = EVENTs_dwt | 0x0,
+    EVENT_pll_error = EVENTs_dwt | 0xAA,
 } MyEvents;
 
 typedef uint16 MsgEvent; // MyEvents | MSG_TYPE
