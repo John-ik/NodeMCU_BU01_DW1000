@@ -350,17 +350,33 @@ void handler_rxok(uint32 status){
   // RXFCG automatical clear on next receive
 }
 
+static uint32 last_rxfailed_status = 0;
+void handler_rxfailed(uint32 status){
+  dwt_reset_status(status & DWT_IRQ_RXFAILED);
+  last_rxfailed_status = status & DWT_IRQ_RXFAILED;
+}
+
+void handler_rxtimeout(uint32 status){
+  UNUSED(status);
+  event = EVENT_rxtimeout;
+}
+
 /// assign dwt_handlers
 void init_irq(){
   _dwt_handler_send = &handler_send;
   _dwt_handler_pll_error = &handler_pll_error;
   _dwt_handler_rxok = &handler_rxok;
+  _dwt_handler_rxfailed = &handler_rxfailed;
+  _dwt_handler_rxtimeout = &handler_rxtimeout;
 
   dwt_setinterrupt(
     DWT_IRQ_SEND |
     DWT_IRQ_PLL_ERROR |
-    DWT_IRQ_RXOK
-  , 1);
+    DWT_IRQ_RXOK |
+    DWT_IRQ_RXFAILED |
+    DWT_IRQ_RXTIMEOUT
+    , 1
+  );
 }
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -481,98 +497,54 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if (event == EVENT_pll_error){
-      if (last_pll_err & SYS_STATUS_CLKPLL_LL){
-        DEBUG_transmit_fmt("!!! Clock PLL Losing Lock. №%u !!!", pll_err_counter);
-      }
-      if (last_pll_err & SYS_STATUS_RFPLL_LL){
-        DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u !!!", pll_err_counter);
-      }
-    }
-
-    uint8 was_timer = 0;
-    uint32 timer_timeout = 1000;
-    { // wait for RX or user timeout
-      uint32 timer = HAL_GetTick();
-      while (
-        !((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))
-        #ifdef TAG
-          && (HAL_GetTick() - timer < timer_timeout)
-        #endif
-          )
-      { }; // Wait Recieve Good or Error
-      #ifdef TAG
-        was_timer = HAL_GetTick() - timer >= timer_timeout;
-        if (was_timer)
-          dwt_forcetrxoff(); // shutdown TX/RX
-      #endif
-    }
-
-
-    // led_signal(1);
-    MyEvents event = 0;
-    if (STATUS_OK(status_reg)){
-      // clear good bits
-      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-      recieverx(); // place msg in msg_buf
-      
-      event = toMsgEvent(status_reg, msg_buffer.type, 0);
-      
-      showMsg(uart_buf, msg_buffer);
-      DEBUG_transmit_fmt("%s at %u", uart_buf, dwt_readrxtimestamphi32());
-    }else if (was_timer){
-      event = EVENT_rxtimeout;
-
-      #ifdef TAG
-        static uint32 timer_pull_one = 0; 
-        if (HAL_GetTick() - timer_pull_one > 5000){
-          timer_pull_one = HAL_GetTick();
-          event = EVENT_initiate_pull_one;
-        }
-      #endif
-
-      // dump Digital Diagnostics Interface
-      {
-          dwt_deviceentcnts_t cntrs;
-          dwt_readeventcounters(&cntrs);
-          DEBUG_transmit_fmt("DIAG:\n"
-                            "\tPHR er = %u"
-                            "\tRSD er = %u"
-                            "\tcrc good = %u"
-                            "\tcrc bad = %u"
-                            "\tframe filter reject = %u"
-                            "\toverrun = %u"
-                            "\tsfd timeout = %u"
-                            "\tpreamble timeout = %u"
-                            "\tRX timeout = %u"
-                            "\tTX sent = %u"
-                            "\tperiod/2 (big TX delay)= %u"
-                            "\tshort TX delay = %u\n"
-                            "\treq2resp = %u", 
-            cntrs.PHE, cntrs.RSL, cntrs.CRCG, cntrs.CRCB, cntrs.ARFE, cntrs.OVER, cntrs.SFDTO, cntrs.PTO, cntrs.RTO, cntrs.TXF, cntrs.HPW, cntrs.TXW,
-            request_to_response_delay
-          );
-      }
-    }else{
-      // clear errors
-      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
-      // reset receiver for correctly calc timestamp in future
-      // softreset_receiver();
-      dwt_rxreset();
-
-      // if (HAL_GetTick() - timer > 5000){
-      //   event = toMsgEvent(0, 0, EVENT_initiate_pull_one);
-      //   timer = HAL_GetTick();
-      // }else{
-      event = toMsgEvent(status_reg, 0, 0);
-      // }
-    }
-    DEBUG_transmit_fmt("BEFORE STEP: event = %s; state = %s; Status_reg = %u; seq = %u",
+    if (event){
+      DEBUG_transmit_fmt("BEFORE: event = %s; state = %s; status = 0x%X; seq = %u",
         showEvent(event), showState(state), status_reg, frame_seq_nb
-    );
-    step(event);
-    DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; delay = %u; status = %u", showState(state), debug_var, request_to_response_delay, dwt_read32bitreg(SYS_STATUS_ID));
+      );
+    }
+
+    if (EVENT_is(event, EVENTs_dwt)){ // Aka server event
+      // EVENT_rxtimeout processing in step
+
+      if (event == EVENT_pll_error){
+        if (last_pll_err & SYS_STATUS_CLKPLL_LL){
+          DEBUG_transmit_fmt("!!! Clock PLL Losing Lock. №%u (common counter with RF_PLL_LL) !!!", pll_err_counter);
+        }
+        if (last_pll_err & SYS_STATUS_RFPLL_LL){
+          DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u (common counter with CPLL_LL) !!!", pll_err_counter);
+        }
+      }
+    }
+
+    if (EVENT_is(event, EVENTs_host)){ // Aka client event
+
+    }
+
+    if (event && (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || event == EVENT_rxtimeout)){ // All for msg protocols
+      step(event);
+
+      DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; status = 0x%X", showState(state), debug_var, dwt_read32bitreg(SYS_STATUS_ID));
+    }
+
+    event = EVENT_none;
+
+    #ifdef TAG
+      static uint32 timer_pull_one = 0; 
+      if (HAL_GetTick() - timer_pull_one > 5000){
+        timer_pull_one = HAL_GetTick();
+        event = EVENT_initiate_pull_one;
+      }
+    #endif
+
+    #ifdef DEBUG_DWT_DIAG
+      static uint32 timer_diag = 0;
+      if (HAL_GetTick() - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
+        timer_diag = HAL_GetTick();
+        dwt_showDiag(uart_buf);
+        Transmit(uart_buf);
+        Transmit("\n");
+      }
+    #endif
   }
   /* USER CODE END 3 */
 }
