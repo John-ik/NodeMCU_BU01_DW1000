@@ -15,12 +15,12 @@
 #define MSG_ERROR_TX 0xF1
 #define MSG_ERROR_RX 0xF2
 
-#define EVENTs_msg    0x000
-#define EVENTs_custom 0x200
-#define EVENTs_host   0x400
-#define EVENTs_dwt    0x500
+#define EVENTs_msg    0x1000
+#define EVENTs_custom 0x2000
+#define EVENTs_host   0x4000
+#define EVENTs_dwt    0x5000
 
-#define EVENT_is(event, event_class) ((event & 0xff00) == event_class)
+#define EVENT_is(event, event_class) ((event & 0xf000) == event_class)
 
 typedef enum{
     EVENT_none = 0,
