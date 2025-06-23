@@ -78,7 +78,7 @@ MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len){
 }
 
 char* showEvent(MyEvents event){
-    char* default_str = "! UNDEFINED EVENT 0x%02X !";
+    char* default_str = "! UNDEFINED EVENT 0x%04X !";
 
     switch(event){
         case EVENT_none:              return "EVENT_none";
@@ -102,6 +102,20 @@ char* showEvent(MyEvents event){
             sprintf(default_str, default_str, event);
             return default_str;
     }
+}
+
+char* showMsgType(MSG_Types type){
+    switch(type){
+        case MSG_PULL_ONE: return "MSG_pull_one";
+        case MSG_RESP_ONE: return "MSG_resp_one";
+        case MSG_PULL:     return "MSG_pull";
+        case MSG_RESPONSE: return "MSG_response";
+        case MSG_FINAL:    return "MSG_final";
+        case MSG_DISTANCE: return "MSG_distance";
+        case MSG_ERROR_RX: return "! MSG_ERROR_RX !";
+        case MSG_ERROR_TX: return "! MSG_ERROR_TX !";
+    }
+    return "! undefined msg type !";
 }
 
 void showMsg(char* str, MacMessage msg){
@@ -148,6 +162,6 @@ void showMsg(char* str, MacMessage msg){
                     "%s\n"
                     "RAW: 0x%s",
 
-        showEvent(msg.type), msg.frame_control, msg.seq_num, msg.dest_pan, msg.dest_addr, msg.src_addr, data_buf, bytes_s
+        showMsgType(msg.type), msg.frame_control, msg.seq_num, msg.dest_pan, msg.dest_addr, msg.src_addr, data_buf, bytes_s
     );
 }

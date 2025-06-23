@@ -6,14 +6,16 @@
 #include "deca_types.h"
 #include "deca_regs.h"
 
-#define MSG_PULL_ONE 0x01
-#define MSG_RESP_ONE 0x02
-#define MSG_PULL     0x11
-#define MSG_RESPONSE 0x22
-#define MSG_FINAL    0x33
-#define MSG_DISTANCE 0x44
-#define MSG_ERROR_TX 0xF1
-#define MSG_ERROR_RX 0xF2
+typedef enum {
+    MSG_PULL_ONE = 0x01,
+    MSG_RESP_ONE = 0x02,
+    MSG_PULL     = 0x11,
+    MSG_RESPONSE = 0x22,
+    MSG_FINAL    = 0x33,
+    MSG_DISTANCE = 0x44,
+    MSG_ERROR_TX = 0xF1,
+    MSG_ERROR_RX = 0xF2,
+} MSG_Types;
 
 #define EVENTs_msg    0x1000
 #define EVENTs_custom 0x2000
@@ -155,6 +157,7 @@ MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len);
 
 char* showEvent(MyEvents event);
 
+char* showMsgType(MSG_Types type);
 /* 
 str.length > 110
 
