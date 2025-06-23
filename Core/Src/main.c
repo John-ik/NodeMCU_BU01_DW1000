@@ -169,13 +169,9 @@ uint16 recieverx(){
 
     msg_buffer = bytes2msg(rx_buffer, frame_len);
     led_signal(msg_buffer.seq_num & 7);
-    // dwt_readfromdevice(RX_TIME_ID, 0, 14, rx_buffer);
-    // char* uart_buf_ptr = uart_buf; 
-    // for (size_t i = 0; i < 14; i++){
-    //   sprintf(uart_buf_ptr, "%02X", rx_buffer[i]);
-    //   uart_buf_ptr += 2;
-    // }
-    // DEBUG_transmit_fmt("reg 0x15 RX_TIME = %s", uart_buf);
+    // Transmit("receiverx\n");
+    // showMsg(uart_buf, msg_buffer);
+    // Transmit(uart_buf);
   }
   return frame_len;
 }
@@ -521,7 +517,7 @@ int main(void)
       flag_rxfailed_status = 0;
     }else if(flag_rxok){
       saved_event = event;
-      event = msg_buffer.type;
+      event = MSG_TYPE_2_EVENT(msg_buffer.type);
       flag_rxok = 0;
     }else if(flag_rxtimeout){
       saved_event = event;

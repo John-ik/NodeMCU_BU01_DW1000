@@ -24,6 +24,8 @@ typedef enum {
 
 #define EVENT_is(event, event_class) ((event & 0xf000) == event_class)
 
+#define MSG_TYPE_2_EVENT(type) (EVENTs_msg | type)
+
 typedef enum{
     EVENT_none = 0,
 
