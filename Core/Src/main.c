@@ -248,7 +248,7 @@ void step(MsgEvent event){
           sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
           return;
 
-        case MSG_PULL_ONE: // in STATE_Receive
+        case EVENT_msg_PULL_ONE: // in STATE_Receive
           // led_signal(3);
           toIdle();
 
@@ -280,7 +280,7 @@ void step(MsgEvent event){
 
     case STATE_Pull_one:
       switch(event){
-        case MSG_RESP_ONE: // in STATE_Pull_one
+        case EVENT_msg_RESP_ONE: // in STATE_Pull_one
           req_tx_ts = get_tx_ts();
           ans_rx_ts = get_rx_ts();
           ans_tx_ts = msg_buffer.data.resp_one.resp_tx_ts;
