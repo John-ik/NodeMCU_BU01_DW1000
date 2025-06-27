@@ -223,7 +223,7 @@ void toIdle(){
 }
 
 void step(MsgEvent event){
-  uint64 pull_rx_ts, resp_tx_time;
+  uint64 pull_rx_ts, resp_tx_ts;
   uint64 req_tx_ts, ans_rx_ts, ans_tx_ts, req_rx_ts;
 
   switch(state){
@@ -249,27 +249,29 @@ void step(MsgEvent event){
           toIdle();
 
           pull_rx_ts = get_rx_ts();
-          resp_tx_time = (pull_rx_ts + (2800 * UUS_TO_DWT_TIME));
-          dwt_setdelayedtrxtime((uint32) (resp_tx_time) >> 8); 
+          resp_tx_ts = (get_sys_ts() + (2000 * UUS_TO_DWT_TIME));
+          // dwt_setdelayedtrxtime((uint32) (resp_tx_ts) >> 8);
           //? set rx timreout and rxaftertxdelay
 
-          // uint64 resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
+          resp_tx_ts = (((uint64)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
           resp_one_msg.seq_num   = msg_buffer.seq_num;
           resp_one_msg.dest_addr = msg_buffer.src_addr;
           resp_one_msg.dest_pan  = MY_PAN_ID;
           resp_one_msg.src_addr  = my_addr;
           resp_one_msg.data.resp_one.pull_rx_ts = pull_rx_ts;
-          resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_time; // + TX_ANT_DLY
+          resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_ts; // + TX_ANT_DLY
 
-          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED);
+          HAL_Delay(1);
+          int err = sendtx(resp_one_msg, /* DWT_START_TX_DELAYED | */ DWT_RESPONSE_EXPECTED);
 
           showMsg(uart_buf, resp_one_msg);
-          DEBUG_transmit_fmt("sended: %s", uart_buf);
+          uint64 systs = get_sys_ts();
+          DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) systs >> 8);
 
           return;
 
         default: // in STATE_Receive
-          toReceiveInTime(0);
+          toReceive();
           return;
       }
       return; // after switch(event) <-- STATE_Receive
@@ -318,6 +320,7 @@ static uint8 flag_send = 0;
 void handler_send(uint32 status){
   UNUSED(status);
   flag_send = 1;
+  // Transmit("send\n");
 }
 
 static uint8 pll_err_counter = 0;
@@ -325,6 +328,7 @@ static uint32 flag_pll_err = 0; // and save which pll issue
 void handler_pll_error(uint32 status){
   pll_err_counter++;
   flag_pll_err = status & DWT_IRQ_PLL_ERROR;
+  // Transmit("pll_err\n");
 }
 
 static uint8 flag_rxok = 0;
@@ -332,17 +336,20 @@ void handler_rxok(uint32 status){
   UNUSED(status);
   recieverx();
   flag_rxok = 1;
+  // Transmit("rxok\n");
 }
 
 static uint32 flag_rxfailed_status = 0;
 void handler_rxfailed(uint32 status){
   flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
+  // Transmit("rxfail\n");
 }
 
 static uint8 flag_rxtimeout = 0;
 void handler_rxtimeout(uint32 status){
   UNUSED(status);
   flag_rxtimeout = 1;
+  // Transmit("rxtime\n");
 }
 
 /// assign dwt_handlers
