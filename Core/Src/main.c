@@ -135,14 +135,18 @@ void SystemClock_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
+
+#define RANGING_ON 1
+#define RANGING_OFF 0
 /* USER CODE BEGIN 0 */
 /*! @brief 
  @param[in] msg MacMessage
  @param[in] tx_mode pass to `dwt_starttx`
+ @param[in] ranging pass to `dwt_writetxfctrl` (true for ranging)
  @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed),
           or `-2` for MSG_ERROR_RX-TX types
  */
-int sendtx(MacMessage msg, uint8 tx_mode){
+int sendtx(MacMessage msg, uint8 tx_mode, const int ranging){
   uint16 frame_len = msg2bytes(msg, tx_buffer);
 
   // showMsg(uart_buf, msg);
@@ -154,7 +158,7 @@ int sendtx(MacMessage msg, uint8 tx_mode){
   led_signal(msg.seq_num & 7);
 
   dwt_writetxdata(frame_len, tx_buffer, 0);
-  dwt_writetxfctrl(frame_len, 0);
+  dwt_writetxfctrl(frame_len, 0, ranging);
 
   return debug_var = dwt_starttx(tx_mode);
 }
@@ -163,13 +167,13 @@ int sendtx(MacMessage msg, uint8 tx_mode){
  * @brief get MacMessage and place in `msg_buffer`
  */
 uint16 recieverx(){
+  Transmit("receiverx\n");
   uint16 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
   if (frame_len <= MSG_MAX_LEN){
     dwt_readrxdata(rx_buffer, frame_len, 0);
 
     msg_buffer = bytes2msg(rx_buffer, frame_len);
     led_signal(msg_buffer.seq_num & 7);
-    // Transmit("receiverx\n");
     // showMsg(uart_buf, msg_buffer);
     // Transmit(uart_buf);
   }
@@ -241,7 +245,7 @@ void step(MsgEvent event){
           
           state = STATE_Pull_one; // mutate state
 
-          sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+          sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
           return;
 
         case EVENT_msg_PULL_ONE: // in STATE_Receive
@@ -262,7 +266,7 @@ void step(MsgEvent event){
           resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_ts; // + TX_ANT_DLY
 
           HAL_Delay(1);
-          int err = sendtx(resp_one_msg, /* DWT_START_TX_DELAYED | */ DWT_RESPONSE_EXPECTED);
+          int err = sendtx(resp_one_msg, /* DWT_START_TX_DELAYED | */ DWT_RESPONSE_EXPECTED, RANGING_ON);
 
           showMsg(uart_buf, resp_one_msg);
           uint64 systs = get_sys_ts();
@@ -334,9 +338,9 @@ void handler_pll_error(uint32 status){
 static uint8 flag_rxok = 0;
 void handler_rxok(uint32 status){
   UNUSED(status);
+  Transmit("rxok\n");
   recieverx();
   flag_rxok = 1;
-  // Transmit("rxok\n");
 }
 
 static uint32 flag_rxfailed_status = 0;
@@ -424,9 +428,7 @@ int main(void)
   HAL_Delay(100);
 
   /* Configure DW1000. See NOTE 6 below. */
-  if(dwt_configure(&config) == DWT_ERROR){
-    DEBUG_transmit_str("!!! CONFIGURE ERROR !!!");
-  }
+  dwt_configure(&config);
 
   // recommended from Software_API_Guide
   // dwt_txconfig_t txconfig = {
@@ -479,7 +481,6 @@ int main(void)
   led_signal(0);
 
   dwt_setrxtimeout(0);
-  dwt_setautorxreenable(1); // auto re-enable RX after fail RX (except rxtimeout)
   dwt_rxenable(0); // start RX
   /* USER CODE END 2 */
 

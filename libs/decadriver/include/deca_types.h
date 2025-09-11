@@ -1,10 +1,10 @@
 /*! ----------------------------------------------------------------------------
- *  @file 	deca_types.h
- *  @brief 	DecaWave general type definitions
+ *  @file   deca_types.h
+ *  @brief  Decawave general type definitions
  *
  * @attention
  *
- * Copyright 2013 (c) DecaWave Ltd, Dublin, Ireland.
+ * Copyright 2013 (c) Decawave Ltd, Dublin, Ireland.
  *
  * All rights reserved.
  *
@@ -34,7 +34,7 @@ typedef unsigned short uint16;
 #ifndef uint32
 #ifndef _DECA_UINT32_
 #define _DECA_UINT32_
-typedef unsigned int uint32;
+typedef unsigned long uint32;
 #endif
 #endif
 
@@ -55,7 +55,7 @@ typedef signed short int16;
 #ifndef int32
 #ifndef _DECA_INT32_
 #define _DECA_INT32_
-typedef signed int int32;
+typedef signed long int32;
 #endif
 #endif
 
