@@ -51,6 +51,7 @@ typedef enum{
     // ------------------------- DWT -------------------------
     
     EVENT_rxtimeout = EVENTs_dwt | 0x0,
+    EVENT_rxfail    = EVENTs_dwt | 0x10,
     EVENT_pll_error = EVENTs_dwt | 0xAA,
 } MyEvents;
 

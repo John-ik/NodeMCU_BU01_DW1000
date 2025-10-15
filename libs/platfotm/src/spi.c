@@ -27,6 +27,7 @@ void dw_deactivate(){
   * @param  len : length in byte of the data to send and receive
   * @retval status of the send operation (0) in case of error
   */
+__attribute__((optimize("O3")))
 spi_status_e spi_transfer(SPI_TypeDef *spi, const uint8_t *tx_buffer, uint8_t *rx_buffer, uint16_t len)
 {
   spi_status_e ret = SPI_OK;

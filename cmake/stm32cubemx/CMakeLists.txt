@@ -15,12 +15,8 @@ target_compile_definitions(stm32cubemx INTERFACE
 
 target_include_directories(stm32cubemx INTERFACE
     ../../Core/Inc
-    ../../USB_DEVICE/App
-    ../../USB_DEVICE/Target
     ../../Drivers/STM32F1xx_HAL_Driver/Inc
     ../../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy
-    ../../Middlewares/ST/STM32_USB_Device_Library/Core/Inc
-    ../../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
     ../../Drivers/CMSIS/Device/ST/STM32F1xx/Include
     ../../Drivers/CMSIS/Include
 )
@@ -33,10 +29,6 @@ target_sources(stm32cubemx INTERFACE
     ../../Core/Src/usart.c
     ../../Core/Src/stm32f1xx_it.c
     ../../Core/Src/stm32f1xx_hal_msp.c
-    ../../USB_DEVICE/App/usb_device.c
-    ../../USB_DEVICE/App/usbd_desc.c
-    ../../USB_DEVICE/App/usbd_cdc_if.c
-    ../../USB_DEVICE/Target/usbd_conf.c
     ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c
     ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd.c
     ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pcd_ex.c
@@ -62,10 +54,6 @@ target_sources(stm32cubemx INTERFACE
     ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c
     ../../Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c
     ../../Core/Src/system_stm32f1xx.c
-    ../../Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_core.c
-    ../../Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.c
-    ../../Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ioreq.c
-    ../../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/usbd_cdc.c
     ../../Core/Src/sysmem.c
     ../../Core/Src/syscalls.c
     ../../startup_stm32f103xb.s

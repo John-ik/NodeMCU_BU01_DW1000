@@ -1,8 +1,8 @@
 #pragma once
 
 // Indexing TAGs and Anchor from 1. 0 is special
-#define TAG
-// #define ANCHOR
+// #define TAG
+#define ANCHOR
 
 #define MY_PAN_ID 0x0010 // ID of network
 
@@ -46,7 +46,7 @@ dwt_config_t config =
 {
     5,               /* Channel number. */
     DWT_PRF_16M,     /* Pulse repetition frequency. */
-    DWT_PLEN_2048,   /* Preamble length. */
+    DWT_PLEN_1024,   /* Preamble length. */
     DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
     4,               /* TX preamble code. Used in TX only. */
     4,               /* RX preamble code. Used in RX only. */
@@ -61,7 +61,7 @@ dwt_config_t config =
  * 1 uus = 512 / 499.2 ? and 1 ? = 499.2 * 128 dtu.
  * ! number is arounded to easy optimize multiple 
  */
-#define UUS_TO_DWT_TIME 65536
+#define UUS_TO_DWT_TIME 65536ull
 
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the

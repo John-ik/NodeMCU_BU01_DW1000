@@ -21,7 +21,6 @@
 #include "i2c.h"
 #include "spi.h"
 #include "usart.h"
-#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -253,8 +252,9 @@ void step(MsgEvent event){
           toIdle();
 
           pull_rx_ts = get_rx_ts();
-          resp_tx_ts = (get_sys_ts() + (2000 * UUS_TO_DWT_TIME));
-          // dwt_setdelayedtrxtime((uint32) (resp_tx_ts) >> 8);
+          static uint64 pull_one4resp_delay = 1;
+          resp_tx_ts = (pull_rx_ts + (pull_one4resp_delay * UUS_TO_DWT_TIME));
+          dwt_setdelayedtrxtime((uint32) (resp_tx_ts >> 8) );
           //? set rx timreout and rxaftertxdelay
 
           resp_tx_ts = (((uint64)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
@@ -265,11 +265,16 @@ void step(MsgEvent event){
           resp_one_msg.data.resp_one.pull_rx_ts = pull_rx_ts;
           resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_ts; // + TX_ANT_DLY
 
-          HAL_Delay(1);
-          int err = sendtx(resp_one_msg, /* DWT_START_TX_DELAYED | */ DWT_RESPONSE_EXPECTED, RANGING_ON);
+          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          if (err){
+            toReceive();
+            pull_one4resp_delay <<= 1;
+          }
 
           showMsg(uart_buf, resp_one_msg);
           uint64 systs = get_sys_ts();
+          uint8 buf[DX_TIME_LEN];
+          dwt_readfromdevice(DX_TIME_ID, 0, DX_TIME_LEN, buf);
           DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) systs >> 8);
 
           return;
@@ -332,13 +337,11 @@ static uint32 flag_pll_err = 0; // and save which pll issue
 void handler_pll_error(uint32 status){
   pll_err_counter++;
   flag_pll_err = status & DWT_IRQ_PLL_ERROR;
-  // Transmit("pll_err\n");
 }
 
 static uint8 flag_rxok = 0;
 void handler_rxok(uint32 status){
   UNUSED(status);
-  Transmit("rxok\n");
   recieverx();
   flag_rxok = 1;
 }
@@ -346,14 +349,12 @@ void handler_rxok(uint32 status){
 static uint32 flag_rxfailed_status = 0;
 void handler_rxfailed(uint32 status){
   flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
-  // Transmit("rxfail\n");
 }
 
 static uint8 flag_rxtimeout = 0;
 void handler_rxtimeout(uint32 status){
   UNUSED(status);
   flag_rxtimeout = 1;
-  // Transmit("rxtime\n");
 }
 
 /// assign dwt_handlers
@@ -407,8 +408,6 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
-  MX_I2C1_Init();
-  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
   spi_low_speed();
   // HAL_Delay(100);
@@ -521,7 +520,9 @@ int main(void)
       event = EVENT_pll_error;
       flag_pll_err = 0;
     }else if(flag_rxfailed_status){
-      //TODO:
+      //TODO: Восстановаление  приема после ошибки
+      saved_event = event;
+      event = EVENT_rxfail;
       flag_rxfailed_status = 0;
     }else if(flag_rxok){
       saved_event = event;
@@ -554,6 +555,12 @@ int main(void)
         if (flag_pll_err & SYS_STATUS_RFPLL_LL){
           DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u (common counter with CPLL_LL) !!!", pll_err_counter);
         }
+      }
+
+      if (event == EVENT_rxfail){
+        dwt_rxenable(0); // start RX
+        //TODO: отправка пакета об ошибке,
+        state = STATE_Receive;
       }
     }
 
