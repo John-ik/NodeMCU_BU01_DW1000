@@ -146,23 +146,23 @@ int readfromspi (
 
 int spi_set_BaudRate(uint32_t baudrate){
   uint32_t prescaler = SPI_BAUDRATEPRESCALER_256; // set minimal by default
-  uint32_t fCLCL = HAL_RCC_GetHCLKFreq();
+  uint32_t fCLCL = HAL_RCC_GetHCLKFreq(); //? учитываеться предделитель AHB ?
 
-  if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_2 >> 3)))
+  if (baudrate >= (fCLCL >> 1))
     prescaler = SPI_BAUDRATEPRESCALER_2;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_4 >> 3)))
+  else if (baudrate >= (fCLCL >> 2))
     prescaler = SPI_BAUDRATEPRESCALER_4;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_8 >> 3)))
+  else if (baudrate >= (fCLCL >> 3))
     prescaler = SPI_BAUDRATEPRESCALER_8;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_16 >> 3)))
+  else if (baudrate >= (fCLCL >> 4))
     prescaler = SPI_BAUDRATEPRESCALER_16;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_32 >> 3)))
+  else if (baudrate >= (fCLCL >> 5))
     prescaler = SPI_BAUDRATEPRESCALER_32;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_64 >> 3)))
+  else if (baudrate >= (fCLCL >> 6))
     prescaler = SPI_BAUDRATEPRESCALER_64;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_128 >> 3)))
+  else if (baudrate >= (fCLCL >> 7))
     prescaler = SPI_BAUDRATEPRESCALER_128;
-  else if (baudrate >= (fCLCL >> (SPI_BAUDRATEPRESCALER_256 >> 3)))
+  else if (baudrate >= (fCLCL >> 8))
     prescaler = SPI_BAUDRATEPRESCALER_256;
   
 
