@@ -28,7 +28,7 @@ extern char DEBUG_uart_buf[];
 // делает путь относительно папки проекта (зависит от папки)
 
 #define DEBUG_transmit_fmt(fmt, ...) \
-  sprintf(DEBUG_uart_buf, "%s:%d: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); Transmit(DEBUG_uart_buf+68)
+  sprintf(DEBUG_uart_buf, "%s:%d: " fmt "\n", __FILE__, __LINE__, __VA_ARGS__); Transmit(DEBUG_uart_buf)
 
 #define DEBUG_transmit_str(str) DEBUG_transmit_fmt("%s", str)
 
