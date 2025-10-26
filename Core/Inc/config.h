@@ -1,8 +1,5 @@
 #pragma once
 
-#include "deca_device_api.h"
-#include "deca_regs.h"
-
 // Indexing TAGs and Anchor from 1. 0 is special
 // #define TAG
 #define ANCHOR
@@ -18,12 +15,10 @@
 #define TAG_ID_marker    0xB000
 
 #ifdef TAG
-  #define EX_06A_DEF
   char whoami[] = "TAG";
   uint16 my_addr = TAG_ID_marker | COMPILE_ID;
 #endif
 #ifdef ANCHOR
-  #define EX_06B_DEF
   char whoami[] = "ANCHOR";
   uint16 my_addr = ANCHOR_ID_marker | COMPILE_ID;
 #endif
