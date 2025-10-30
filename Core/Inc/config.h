@@ -96,27 +96,24 @@ dwt_config_t config =
 
 // ==================== PROTOLOCS CONFIG ====================
 
+#define DEFAULT_RX_TIMEOUT_UUS      1000
+
 #define INITIATE_PULL_ONE_TIMEOUT_MS 5000
 
-#define PULL_ONE_TIMEOUT_US 10000
-
-
-
-// experiment STUFF
 
 /// инициация со стороны тэга и теперь тэг ждет столько до начала RX чтобы поймать RESP
 #define POLL_TX_TO_RESP_RX_DLY_UUS  5000uLL
 /// якорь поймал POLL и отправит RESP через
 #define POLL_RX_TO_RESP_TX_DLY_UUS  5250uLL
 /// тэг ждёт в течении
-#define RESP_RX_TIMEOUT_UUS         1000
+#define RESP_RX_TIMEOUT_UUS         DEFAULT_RX_TIMEOUT_UUS
 
 /// якорь ждет после RESP чтобы начать RX для FINAL
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 5000uLL
 /// тэг поймал RESP и отправит FINAL через
 #define RESP_RX_TO_FINAL_TX_DLY_UUS 5250uLL
 /// якорь ждёт
-#define FINAL_RX_TIMEOUT_UUS        1000
+#define FINAL_RX_TIMEOUT_UUS        DEFAULT_RX_TIMEOUT_UUS
 
 
 // #define PRE_TIMEOUT 8

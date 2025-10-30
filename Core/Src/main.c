@@ -33,7 +33,6 @@
 #include "deca_regs.h"
 #include "deca_sleep.h"
 
-#include "mac.h"
 #include "deca_leds.h"
 #include "messages.h"
 #include "deca_funcs.h"
@@ -70,43 +69,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-char uart_buf[512]; 
+#define UART_BUF_len 512
+char uart_buf[UART_BUF_len]; 
 char DEBUG_uart_buf[630]; 
-
-
-/* Frames used in the ranging process. See NOTE 2 below. */
-
-
-static MacMessage pull_one_msg = {
-  0x4188, 0, 0, 0, 0, MSG_PULL_ONE, MSG_DATA_EMPTY, 0
-};
-
-static MacMessage resp_one_msg = {
-  0x4188, 0, 0, 0, 0, MSG_RESP_ONE, MSG_DATA_EMPTY, 0
-};
-
-
-static uint8 tx_buffer[MSG_MAX_LEN];
-static uint8 rx_buffer[MSG_MAX_LEN];
-static MacMessage msg_buffer;
-
-/*
-MAC
-MSG:
-  0,1: Frame Control
-  2:   Number Sequence
-  3,4: Dest PAN ID
-  5,6: Dest Address
-  7,8: Source Address
-  9:   My Type
-
-  n-2,n-1: FCS - CRC (not for user. let with zeros)
-*/
-uint8 poll_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_PULL, 0, 0};
-uint8 resp_msg[] =  {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_RESPONSE, 0x02, 0, 0, 0, 0};
-uint8 final_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_FINAL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint8 distance_msg[] = {0x41, 0x88, 0, 0x00, 0xFF, 0xFF, 0xFF, 'M', 'C', MSG_DISTANCE, 0, 0,0, 0, 0};
-
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -115,15 +80,7 @@ static uint8 frame_seq_nb_semaphore = 0;
 
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-// #define RX_BUF_LEN 24
-// static uint8 rx_buffer[RX_BUF_LEN];
-
-/* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
-static uint32 status_reg = 0;
-
-static uint16 request_to_response_delay = 10; 
-
-static int debug_var;
+static uint8 rx_buffer[MSG_MAX_LEN];
 
 /* USER CODE END PV */
 
@@ -139,42 +96,34 @@ void SystemClock_Config(void);
 #define RANGING_OFF 0
 /* USER CODE BEGIN 0 */
 /*! @brief 
- @param[in] msg MacMessage
+ @param[in] msg массив байтов представляющий собой сообщение
  @param[in] tx_mode pass to `dwt_starttx`
  @param[in] ranging pass to `dwt_writetxfctrl` (true for ranging)
- @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed),
-          or `-2` for MSG_ERROR_RX-TX types
+ @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed)
  */
-int sendtx(MacMessage msg, uint8 tx_mode, const int ranging){
-  uint16 frame_len = msg2bytes(msg, tx_buffer);
+int sendtx(uint8 msg[], uint8 msg_len, uint8 tx_mode, const int ranging){
+  led_signal(MSG_SEQNUM(msg) & 7);
 
-  // showMsg(uart_buf, msg);
-  // DEBUG_transmit_fmt("TXing: %s", uart_buf);
+  // showMsg(uart_buf, UART_BUF_len, msg);
+  // DEBUG_transmit_str(uart_buf);
 
-  if (msg.type == MSG_ERROR_RX || msg.type == MSG_ERROR_TX)
-    return -2;
+  dwt_writetxdata(msg_len, msg, 0);
+  dwt_writetxfctrl(msg_len, 0, ranging);
 
-  led_signal(msg.seq_num & 7);
-
-  dwt_writetxdata(frame_len, tx_buffer, 0);
-  dwt_writetxfctrl(frame_len, 0, ranging);
-
-  return debug_var = dwt_starttx(tx_mode);
+  return dwt_starttx(tx_mode);
 }
 
 /**
- * @brief get MacMessage and place in `msg_buffer`
+ * @brief получает сообщений и кладет в `rx_buffer`
  */
 uint16 recieverx(){
-  Transmit("receiverx\n");
+  // Transmit("receiverx\n");
   uint16 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
   if (frame_len <= MSG_MAX_LEN){
     dwt_readrxdata(rx_buffer, frame_len, 0);
-
-    msg_buffer = bytes2msg(rx_buffer, frame_len);
-    led_signal(msg_buffer.seq_num & 7);
-    // showMsg(uart_buf, msg_buffer);
-    // Transmit(uart_buf);
+    led_signal(MSG_SEQNUM(rx_buffer) & 7);
+    // showMsg(uart_buf, UART_BUF_len, rx_buffer);
+    // DEBUG_transmit_str(uart_buf);
   }
   return frame_len;
 }
@@ -226,6 +175,7 @@ void toIdle(){
 }
 
 void step(MsgEvent event){
+  uint64 sys_ts, rx_ts;
   uint64 pull_rx_ts, resp_tx_ts;
   uint64 req_tx_ts, ans_rx_ts, ans_tx_ts, req_rx_ts;
 
@@ -235,16 +185,17 @@ void step(MsgEvent event){
         case EVENT_initiate_pull_one: // in STATE_Receive
           // led_signal(2);
           toIdle();
-          dwt_setrxtimeout(PULL_ONE_TIMEOUT_US);
+          dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+          dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
-          pull_one_msg.seq_num = frame_seq_nb++;
-          pull_one_msg.dest_pan  = MY_PAN_ID;
-          pull_one_msg.dest_addr = 0xFFFF;
-          pull_one_msg.src_addr  = my_addr;
+          MSG_SEQNUM(msg_pull_one) = frame_seq_nb++;
+          MSG_PAN_ID(msg_pull_one) = MY_PAN_ID;
+          MSG_DEST_ID(msg_pull_one) = 0xFFFF;
+          MSG_SRC_ID(msg_pull_one)  = my_addr;
           
           state = STATE_Pull_one; // mutate state
 
-          sendtx(pull_one_msg, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          sendtx(msg_pull_one, MSG_PULL_ONE_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
           return;
 
         case EVENT_msg_PULL_ONE: // in STATE_Receive
@@ -252,34 +203,43 @@ void step(MsgEvent event){
           toIdle();
 
           pull_rx_ts = get_rx_ts();
-          static uint64 pull_one4resp_delay = 1;
-          resp_tx_ts = (pull_rx_ts + (pull_one4resp_delay * UUS_TO_DWT_TIME));
+          // static uint64 pull_one4resp_delay = 1;
+          resp_tx_ts = (pull_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32) (resp_tx_ts >> 8) );
           //? set rx timreout and rxaftertxdelay
 
           resp_tx_ts = (((uint64)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
-          resp_one_msg.seq_num   = msg_buffer.seq_num;
-          resp_one_msg.dest_addr = msg_buffer.src_addr;
-          resp_one_msg.dest_pan  = MY_PAN_ID;
-          resp_one_msg.src_addr  = my_addr;
-          resp_one_msg.data.resp_one.pull_rx_ts = pull_rx_ts;
-          resp_one_msg.data.resp_one.resp_tx_ts = resp_tx_ts; // + TX_ANT_DLY
+          MSG_SEQNUM(msg_resp_one)   = MSG_SEQNUM(rx_buffer);
+          MSG_PAN_ID(msg_resp_one)  = MY_PAN_ID;
+          MSG_DEST_ID(msg_resp_one) = MSG_SRC_ID(rx_buffer);
+          MSG_SRC_ID(msg_resp_one)  = my_addr;
+          MSG_RESP_ONE_pull_rx_ts_set(msg_resp_one, &pull_rx_ts);
+          MSG_RESP_ONE_resp_tx_ts_set(msg_resp_one, &resp_tx_ts); // + TX_ANT_DLY
 
-          int err = sendtx(resp_one_msg, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          int err = sendtx(msg_resp_one, MSG_RESP_ONE_len, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
           if (err){
             toReceive();
-            pull_one4resp_delay <<= 1;
           }
 
-          showMsg(uart_buf, resp_one_msg);
-          uint64 systs = get_sys_ts();
+          showMsg(uart_buf, UART_BUF_len, msg_resp_one);
+          sys_ts = get_sys_ts();
           uint8 buf[DX_TIME_LEN];
           dwt_readfromdevice(DX_TIME_ID, 0, DX_TIME_LEN, buf);
-          DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) systs >> 8);
+          DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) sys_ts >> 8);
 
           return;
 
         default: // in STATE_Receive
+          // dump all not supported RX msg
+          sys_ts = get_sys_ts();
+          rx_ts = get_rx_ts();
+          showMsg(uart_buf, UART_BUF_len, rx_buffer);
+          sprintf(DEBUG_uart_buf, "0x%02X%08lX: %s at 0x%02X%08lX\n",
+            (uint8)(sys_ts >> 32), (uint32) sys_ts,
+            uart_buf,
+            (uint8)(rx_ts >> 32), (uint32) rx_ts
+          );
+          Transmit(DEBUG_uart_buf);
           toReceive();
           return;
       }
@@ -290,8 +250,8 @@ void step(MsgEvent event){
         case EVENT_msg_RESP_ONE: // in STATE_Pull_one
           req_tx_ts = get_tx_ts();
           ans_rx_ts = get_rx_ts();
-          ans_tx_ts = msg_buffer.data.resp_one.resp_tx_ts;
-          req_rx_ts = msg_buffer.data.resp_one.pull_rx_ts;
+          MSG_RESP_ONE_resp_tx_ts_get(rx_buffer, &ans_tx_ts);
+          MSG_RESP_ONE_pull_rx_ts_get(rx_buffer, &req_rx_ts);
 
           float time = (float) ((ans_rx_ts - req_tx_ts) - (ans_tx_ts - req_rx_ts)) / 2;
           float dist = time * SPEED_OF_LIGHT / (128 * 499.2 * 1000000);
@@ -495,7 +455,7 @@ int main(void)
     MyEvents event = EVENT_none;
     static MyEvents saved_event = EVENT_none;
 
-    if (saved_event == EVENT_none){
+    if (saved_event == EVENT_none && state <= STATE_Receive){
       #ifdef TAG
         static uint32 timer_pull_one = 0; 
         if (HAL_GetTick() - timer_pull_one > INITIATE_PULL_ONE_TIMEOUT_MS){
@@ -527,7 +487,7 @@ int main(void)
       flag_rxfailed_status = 0;
     }else if(flag_rxok){
       saved_event = event;
-      event = MSG_TYPE_2_EVENT(msg_buffer.type);
+      event = MSG_TYPE_2_EVENT(MSG_TYPE(rx_buffer));
       flag_rxok = 0;
     }else if(flag_rxtimeout){
       saved_event = event;
@@ -573,7 +533,7 @@ int main(void)
     if (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || (event == EVENT_rxtimeout)){
       step(event);
 
-      DEBUG_transmit_fmt("AFTER STEP: state = %s; debug_var = %d; status = 0x%X", showState(state), debug_var, dwt_read32bitreg(SYS_STATUS_ID));
+      DEBUG_transmit_fmt("AFTER STEP: state = %s; status = 0x%X", showState(state), dwt_read32bitreg(SYS_STATUS_ID));
     }
   }
   /* USER CODE END 3 */

@@ -1,7 +1,11 @@
 #include "messages.h"
 
-MacMessage error_rx_msg = MAC_MESSAGE_create(0x4188, MSG_ERROR_RX);
-MacMessage error_tx_msg = MAC_MESSAGE_create(0x4188, MSG_ERROR_TX);
+#define MSG_BEGIN MSG_HEADER_normal
+#define MSG_END   MSG_PLACEHOLDER_CRC
+uint8 msg_pull_one[MSG_PULL_ONE_len] = {MSG_BEGIN, MSG_PULL_ONE, MSG_END};
+uint8 msg_resp_one[MSG_RESP_ONE_len] = {MSG_BEGIN, MSG_RESP_ONE, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
+#undef MSG_BEGIN
+#undef MSG_END
 
 
 MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext){
@@ -12,69 +16,6 @@ MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext){
         return EVENT_rxtimeout;
     }
     return ext;
-}
-
-uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]){
-    uint16 i = 0;
-    WRITEMSG2BYTES_2(out, msg.frame_control, i);
-    WRITEMSG2BYTES_1(out, msg.seq_num, i);
-    WRITEMSG2BYTES_2(out, msg.dest_pan, i);
-    WRITEMSG2BYTES_2(out, msg.dest_addr, i);
-    WRITEMSG2BYTES_2(out, msg.src_addr, i);
-    WRITEMSG2BYTES_1(out, msg.type, i);
-    switch (msg.type){
-        case MSG_RESP_ONE:
-            WRITEMSG2BYTES_5(out, msg.data.resp_one.pull_rx_ts, i);
-            WRITEMSG2BYTES_5(out, msg.data.resp_one.resp_tx_ts, i);
-            break;
-
-        case MSG_PULL_ONE:
-        case MSG_PULL:
-            break;
-
-        case MSG_ERROR_RX:
-        case MSG_ERROR_TX:
-            WRITEMSG2BYTES_4(out, 0xDEADBEEF, i);
-            break;
-
-        default:
-            return 0;
-    }
-    WRITEMSG2BYTES_2(out, 0, i); // crc zeros
-    return i;
-}
-
-MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len){
-    MacMessage msg; uint16 i = 0;
-    msg.frame_control = READBYTES2MSG_2(input, i);
-    msg.seq_num = READBYTES2MSG_1(input, i);
-    msg.dest_pan = READBYTES2MSG_2(input, i);
-    msg.dest_addr= READBYTES2MSG_2(input, i);
-    msg.src_addr = READBYTES2MSG_2(input, i);
-    msg.type = READBYTES2MSG_1(input, i);
-    switch(msg.type){
-        case MSG_RESP_ONE:
-            msg.data.resp_one.pull_rx_ts = READBYTES2MSG_5(input, i);
-            msg.data.resp_one.resp_tx_ts = READBYTES2MSG_5(input, i);
-            break;
-        case MSG_PULL_ONE:
-            break;
-        default:
-            msg.data.error.rx_code = MSG_ERROR_RX_CODE_UNDEFINED_TYPE;
-            msg.data.error.field   = msg.type;
-            msg.type = MSG_ERROR_RX;
-            break;
-    }
-
-    msg._crc = READBYTES2MSG_2(input, i);
-    if (msg_len == i)
-        return msg;
-    else{
-        msg.type = MSG_ERROR_RX;
-        msg.data.error.rx_code = MSG_ERROR_RX_CODE_NOT_EQUAL_LEN;
-        msg.data.error.field   = (msg_len << 16) | (i);
-        return error_tx_msg;
-    }
 }
 
 char* showEvent(MyEvents event){
@@ -89,8 +30,6 @@ char* showEvent(MyEvents event){
         case EVENT_msg_RESPONSE: return "EVENT_msg_response";
         case EVENT_msg_FINAL:    return "EVENT_msg_final";
         case EVENT_msg_DISTANCE: return "EVENT_msg_distance";
-        case EVENT_msg_ERROR_RX: return "! EVENT_msg_ERROR_RX !";
-        case EVENT_msg_ERROR_TX: return "! EVENT_msg_ERROR_TX !";
         
         case EVENT_initiate_pull_one: return "EVENT_initiate_pull_one";
         
@@ -112,56 +51,57 @@ char* showMsgType(MSG_Types type){
         case MSG_RESPONSE: return "MSG_response";
         case MSG_FINAL:    return "MSG_final";
         case MSG_DISTANCE: return "MSG_distance";
-        case MSG_ERROR_RX: return "! MSG_ERROR_RX !";
-        case MSG_ERROR_TX: return "! MSG_ERROR_TX !";
     }
     return "! undefined msg type !";
 }
 
-void showMsg(char* str, MacMessage msg){
-    char data_buf[256] = "";
+void showMsg(char* str, size_t str_size, uint8 msg[]){
+    uint8 frame_len = 12;
 
-    switch(msg.type){
-        case MSG_PULL_ONE:
-            break;
-        case MSG_RESP_ONE:
-            sprintf(data_buf,   "\tpull_rx_ts = 0x%lX%02X\n"
-                                "\tresp_tx_ts = 0x%lX%02X",
-                (uint32_t) msg.data.resp_one.pull_rx_ts >> 8, (uint8_t) msg.data.resp_one.pull_rx_ts & 0xff,
-                (uint32_t) msg.data.resp_one.resp_tx_ts >> 8, (uint8_t) msg.data.resp_one.resp_tx_ts & 0xff
-            );
-            break;
-        case MSG_ERROR_RX:
-            sprintf(data_buf,   "\trx_code = 0x%X"
-                                "\tfield = 0x%X", 
-                    msg.data.error.rx_code, msg.data.error.field);
-            break;
-        case MSG_ERROR_TX:
-            sprintf(data_buf,   "\ttx_code = 0x%X"
-                                "\tfield = 0x%X", 
-                    msg.data.error.tx_code, msg.data.error.field);
-            break;
-        default:
-            return;
-    }
-
-    char bytes_s[2*MSG_MAX_LEN];
-    uint8 bytes[MSG_MAX_LEN];
-    uint16 frame_len = msg2bytes(msg, bytes);
-
-    for(size_t i = 0; i < frame_len; i++){
-        sprintf(bytes_s + 2*i, "%02X", bytes[i]);
-    }
-
-    sprintf(str, "MSG %s\n"
-                    "\tctrl = 0x%X\n"
+    int printed = snprintf(str, str_size,
+                    "MSG> %s\n"
                     "\tseq = %u\n"
                     "\tdest_pan = 0x%X\n"
                     "\tdest_addr = 0x%X\n"
-                    "\tsrc = 0x%X\n"
-                    "%s\n"
-                    "RAW: 0x%s",
-
-        showMsgType(msg.type), msg.frame_control, msg.seq_num, msg.dest_pan, msg.dest_addr, msg.src_addr, data_buf, bytes_s
+                    "\tsrc = 0x%X\n",
+        showMsgType(MSG_TYPE(msg)),
+        MSG_SEQNUM(msg), MSG_PAN_ID(msg), MSG_DEST_ID(msg), MSG_SRC_ID(msg)
     );
+    str += printed;
+    str_size -= printed;
+
+    static uint64_t pull_rx_ts, resp_tx_ts;
+
+    switch(MSG_TYPE(msg)){
+        case MSG_PULL_ONE:
+            frame_len = 12;
+            break;
+        case MSG_RESP_ONE:
+            frame_len = 22;
+            MSG_RESP_ONE_pull_rx_ts_get(msg, &pull_rx_ts);
+            MSG_RESP_ONE_resp_tx_ts_get(msg, &resp_tx_ts);
+            printed = snprintf(str, str_size,
+                                "\tpull_rx_ts = 0x%02X%08lX\n"
+                                "\tresp_tx_ts = 0x%02X%08lX\n",
+                                (uint8)(pull_rx_ts >> 32), (uint32) pull_rx_ts,
+                                (uint8)(resp_tx_ts >> 32), (uint32) resp_tx_ts
+            );
+            goto printed;
+        default:
+            return;
+
+        printed:
+            str += printed;
+            str_size -= printed;
+    }
+    
+    printed = snprintf(str, str_size, "RAW: ");
+    str += printed;
+    str_size -= printed;
+
+    for(size_t i = 0; i < frame_len; i++){
+        printed = snprintf(str, str_size, "%02X", msg[i]);
+        str += printed;
+        str_size -= printed;
+    }
 }

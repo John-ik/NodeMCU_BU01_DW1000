@@ -2,6 +2,7 @@
 
 #include "stdint.h"
 #include "stdio.h"
+#include "string.h" /* memcpy */
 
 #include "deca_types.h"
 #include "deca_regs.h"
@@ -13,9 +14,50 @@ typedef enum {
     MSG_RESPONSE = 0x22,
     MSG_FINAL    = 0x33,
     MSG_DISTANCE = 0x44,
-    MSG_ERROR_TX = 0xF1,
-    MSG_ERROR_RX = 0xF2,
 } MSG_Types;
+
+#define MSG_PLACEHOLDER_8  0
+#define MSG_PLACEHOLDER_16 0,0
+#define MSG_PLACEHOLDER_32 0,0,0,0
+#define MSG_PLACEHOLDER_TS MSG_PLACEHOLDER_32,MSG_PLACEHOLDER_8 ///< 40 bit
+#define MSG_PLACEHOLDER_64 0,0,0,0,0,0,0,0
+
+#define MSG_PLACEHOLDER_CTRL_normal 0x41,0x88
+#define MSG_PLACEHOLDER_SEQNUM 0
+
+/// ctrl, senum, pan_id, dest_id, src_id
+#define MSG_HEADER_normal \
+    MSG_PLACEHOLDER_CTRL_normal, MSG_PLACEHOLDER_SEQNUM, \
+    MSG_PLACEHOLDER_16, MSG_PLACEHOLDER_16, MSG_PLACEHOLDER_16
+
+#define MSG_HEADER_normal_len 9
+
+#define MSG_TYPE_len 1
+
+#define MSG_PLACEHOLDER_CRC MSG_PLACEHOLDER_16
+#define MSG_CRC_len 2
+
+#define MSG_PULL_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + MSG_CRC_len)
+extern uint8 msg_pull_one[];
+#define MSG_RESP_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
+extern uint8 msg_resp_one[];
+
+#define MSG_MAX_LEN MSG_RESP_ONE_len
+
+
+#define MSG_SEQNUM(msg)  (msg[2])
+#define MSG_PAN_ID(msg)  (*((uint16*) &msg[3]))
+#define MSG_DEST_ID(msg) (*((uint16*) &msg[5]))
+#define MSG_SRC_ID(msg)  (*((uint16*) &msg[7]))
+#define MSG_TYPE(msg)    (msg[9])
+
+#define MSG_RESP_ONE_pull_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
+#define MSG_RESP_ONE_pull_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
+#define MSG_RESP_ONE_resp_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)
+#define MSG_RESP_ONE_resp_tx_ts_set(msg, src_p) memcpy(&msg[15], src_p, 5)
+
+
+
 
 #define EVENTs_msg    0x1000
 #define EVENTs_custom 0x2000
@@ -37,8 +79,6 @@ typedef enum{
     EVENT_msg_RESPONSE = EVENTs_msg | MSG_RESPONSE,
     EVENT_msg_FINAL    = EVENTs_msg | MSG_FINAL,
     EVENT_msg_DISTANCE = EVENTs_msg | MSG_DISTANCE,
-    EVENT_msg_ERROR_TX = EVENTs_msg | MSG_ERROR_TX,
-    EVENT_msg_ERROR_RX = EVENTs_msg | MSG_ERROR_RX,
 
     // ------------------------- CUSTOM -------------------------
 
@@ -59,118 +99,18 @@ typedef uint16 MsgEvent; // MyEvents | MSG_TYPE
 
 MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext);
 
-
-#define MSG_DATA_MAX_LEN  24
-#define MSG_MAX_LEN (MSG_DATA_MAX_LEN + 12)
-
-
-typedef union {
-    uint8 _empty;
-    struct {
-        uint64_t pull_rx_ts;
-        uint64_t resp_tx_ts;
-    } resp_one;
-
-    /**
-     * rx_code: check MSG_ERROR_RX_CODE_...
-     * tx_code: check MSG_ERROR_TX_CODE_...
-     * 
-     * field:
-     *      RX -> UNDEFINED_TYPE -> type received byte
-     *      RX -> NOT_EQUAL_LEN  -> receive len into 16:31 bits; i into 0:15
-     */
-    struct {
-        uint8 rx_code;
-        uint8 tx_code;
-        uint32 field; 
-    } error;
-    
-} Msg_Data;
-
-#define MSG_DATA_EMPTY {._empty=0}
-
-typedef struct {
-    uint16 frame_control;
-    uint8  seq_num;
-    uint16 dest_pan;
-    uint16 dest_addr;
-    uint16 src_addr;
-    uint8  type;
-    Msg_Data data;
-    uint16 _crc;
-} MacMessage;
-
-#define MAC_MESSAGE_create(ctrl, msg_type) {   \
-        .frame_control=ctrl,                   \
-        .seq_num=0,                            \
-        .dest_pan=0,                           \
-        .dest_addr=0,                          \
-        .src_addr=0,                           \
-        .type=msg_type,                        \
-        .data=MSG_DATA_EMPTY,                  \
-        ._crc=0                                \
-    }
-
-#define MSG_ERROR_RX_CODE_UNDEFINED_TYPE 0x01
-#define MSG_ERROR_RX_CODE_NOT_EQUAL_LEN  0x02
-
-extern MacMessage error_rx_msg;
-extern MacMessage error_tx_msg;
-
-
-#define WRITEMSG2BYTES_1(out, what, i) \
-    *(out + i++) = what & 0xFF
-
-#define WRITEMSG2BYTES_2(out, what, i) \
-    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
-    *(out + i++) = what & 0xFF
-
-#define WRITEMSG2BYTES_4(out, what, i) \
-    *(out + i++) = (uint8)((what & 0xFF000000) >> 24); \
-    *(out + i++) = (uint8)((what & 0xFF0000) >> 16); \
-    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
-    *(out + i++) = what & 0xFF
-
-#define WRITEMSG2BYTES_5(out, what, i) \
-    *(out + i++) = (uint8)((what & 0xFF00000000) >> 32); \
-    *(out + i++) = (uint8)((what & 0xFF000000) >> 24); \
-    *(out + i++) = (uint8)((what & 0xFF0000)>> 16); \
-    *(out + i++) = (uint8)((what & 0xFF00) >> 8); \
-    *(out + i++) = what & 0xFF
-
-uint16 msg2bytes(MacMessage msg, uint8 out[MSG_MAX_LEN]);
-
-#define READBYTES2MSG_1(input, i) \
-    (input[i++])
-
-#define READBYTES2MSG_2(input, i) \
-    ((input[i] << 8) | (input[i+1])); \
-    i += 2
-
-#define READBYTES2MSG_4(input, i) \
-    ((input[i] << 24) | (input[i+1] << 16) | (input[i+2] << 8) | (input[i+3])); \
-    i += 4
-
-#define READBYTES2MSG_5(input, i) \
-    (((uint64_t) input[i] << 32) |(input[i+1] << 24) | (input[i+2] << 16) | (input[i+3] << 8) | (input[i+4])); \
-    i += 5
-
-MacMessage bytes2msg(uint8 input[MSG_MAX_LEN], uint16 msg_len);
-
-
 char* showEvent(MyEvents event);
 
 char* showMsgType(MSG_Types type);
-/* 
-str.length > 110
 
+/* 
 MSG <TYPE>
-    ctrl = <frame_control>
     seq = <seq_num>
     dest_pan
     dest_addr
     src
     DATA
 
+@param str_size используется в snprintf
 */
-void showMsg(char* str, MacMessage msg);
+void showMsg(char* str, size_t str_size, uint8 msg[]);
