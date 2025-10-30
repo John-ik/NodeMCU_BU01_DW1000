@@ -46,11 +46,12 @@ extern uint8 msg_resp_one[];
 
 
 #define MSG_SEQNUM(msg)  (msg[2])
-#define MSG_PAN_ID(msg)  (*((uint16*) &msg[3]))
+#define MSG_PAN_ID(msg)  (*((uint16*) &msg[3])) //! тут вообще-то должен получаться невыровненый доступ
 #define MSG_DEST_ID(msg) (*((uint16*) &msg[5]))
-#define MSG_SRC_ID(msg)  (*((uint16*) &msg[7]))
+#define MSG_SRC_ID(msg)  (*((uint16*) &msg[7])) //! тут вообще-то должен получаться невыровненый доступ
 #define MSG_TYPE(msg)    (msg[9])
 
+//! раньше была ошибка невыровненного доступа
 #define MSG_RESP_ONE_pull_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
 #define MSG_RESP_ONE_pull_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
 #define MSG_RESP_ONE_resp_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)

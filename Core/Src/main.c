@@ -128,6 +128,65 @@ uint16 recieverx(){
   return frame_len;
 }
 
+// ============================== HANDLERS ==============================
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+  if (GPIO_Pin == IRQ_Pin){
+    dwt_irq();
+  }
+}
+
+static uint8 flag_send = 0;
+void handler_send(uint32 status){
+  UNUSED(status);
+  flag_send = 1;
+  // Transmit("send\n");
+}
+
+static uint8 pll_err_counter = 0;
+static uint32 flag_pll_err = 0; // and save which pll issue
+void handler_pll_error(uint32 status){
+  pll_err_counter++;
+  flag_pll_err = status & DWT_IRQ_PLL_ERROR;
+}
+
+static uint8 flag_rxok = 0;
+void handler_rxok(uint32 status){
+  UNUSED(status);
+  recieverx();
+  flag_rxok = 1;
+}
+
+static uint32 flag_rxfailed_status = 0;
+void handler_rxfailed(uint32 status){
+  flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
+}
+
+static uint8 flag_rxtimeout = 0;
+void handler_rxtimeout(uint32 status){
+  UNUSED(status);
+  flag_rxtimeout = 1;
+}
+
+/// assign dwt_handlers
+void init_irq(){
+  _dwt_handler_send = &handler_send;
+  _dwt_handler_pll_error = &handler_pll_error;
+  _dwt_handler_rxok = &handler_rxok;
+  _dwt_handler_rxfailed = &handler_rxfailed;
+  _dwt_handler_rxtimeout = &handler_rxtimeout;
+
+  dwt_setinterrupt(
+    DWT_IRQ_SEND |
+    DWT_IRQ_PLL_ERROR |
+    DWT_IRQ_RXOK |
+    DWT_IRQ_RXFAILED |
+    DWT_IRQ_RXTIMEOUT
+    , 1
+  );
+}
+
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 // ------------------------------ STATE ------------------------------
 
 
@@ -196,6 +255,7 @@ void step(MsgEvent event){
           state = STATE_Pull_one; // mutate state
 
           sendtx(msg_pull_one, MSG_PULL_ONE_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          while( ! flag_send){} // ждём завершения отправки
           return;
 
         case EVENT_msg_PULL_ONE: // in STATE_Receive
@@ -209,22 +269,24 @@ void step(MsgEvent event){
           //? set rx timreout and rxaftertxdelay
 
           resp_tx_ts = (((uint64)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
-          MSG_SEQNUM(msg_resp_one)   = MSG_SEQNUM(rx_buffer);
+          MSG_SEQNUM(msg_resp_one)  = MSG_SEQNUM(rx_buffer);
           MSG_PAN_ID(msg_resp_one)  = MY_PAN_ID;
           MSG_DEST_ID(msg_resp_one) = MSG_SRC_ID(rx_buffer);
           MSG_SRC_ID(msg_resp_one)  = my_addr;
           MSG_RESP_ONE_pull_rx_ts_set(msg_resp_one, &pull_rx_ts);
-          MSG_RESP_ONE_resp_tx_ts_set(msg_resp_one, &resp_tx_ts); // + TX_ANT_DLY
+          // resp_tx_ts += TX_ANT_DLY;
+          MSG_RESP_ONE_resp_tx_ts_set(msg_resp_one, &resp_tx_ts);
 
-          int err = sendtx(msg_resp_one, MSG_RESP_ONE_len, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          int err = sendtx(msg_resp_one, MSG_RESP_ONE_len, DWT_START_TX_DELAYED, RANGING_ON);
           if (err){
             toReceive();
+            return;
           }
+          
+          while( ! flag_send){} // ждём завершения отправки
 
-          showMsg(uart_buf, UART_BUF_len, msg_resp_one);
           sys_ts = get_sys_ts();
-          uint8 buf[DX_TIME_LEN];
-          dwt_readfromdevice(DX_TIME_ID, 0, DX_TIME_LEN, buf);
+          showMsg(uart_buf, UART_BUF_len, msg_resp_one);
           DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) sys_ts >> 8);
 
           return;
@@ -277,65 +339,6 @@ void step(MsgEvent event){
 }
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ STATE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// ============================== HANDLERS ==============================
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-  if (GPIO_Pin == IRQ_Pin){
-    dwt_irq();
-  }
-}
-
-static uint8 flag_send = 0;
-void handler_send(uint32 status){
-  UNUSED(status);
-  flag_send = 1;
-  // Transmit("send\n");
-}
-
-static uint8 pll_err_counter = 0;
-static uint32 flag_pll_err = 0; // and save which pll issue
-void handler_pll_error(uint32 status){
-  pll_err_counter++;
-  flag_pll_err = status & DWT_IRQ_PLL_ERROR;
-}
-
-static uint8 flag_rxok = 0;
-void handler_rxok(uint32 status){
-  UNUSED(status);
-  recieverx();
-  flag_rxok = 1;
-}
-
-static uint32 flag_rxfailed_status = 0;
-void handler_rxfailed(uint32 status){
-  flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
-}
-
-static uint8 flag_rxtimeout = 0;
-void handler_rxtimeout(uint32 status){
-  UNUSED(status);
-  flag_rxtimeout = 1;
-}
-
-/// assign dwt_handlers
-void init_irq(){
-  _dwt_handler_send = &handler_send;
-  _dwt_handler_pll_error = &handler_pll_error;
-  _dwt_handler_rxok = &handler_rxok;
-  _dwt_handler_rxfailed = &handler_rxfailed;
-  _dwt_handler_rxtimeout = &handler_rxtimeout;
-
-  dwt_setinterrupt(
-    DWT_IRQ_SEND |
-    DWT_IRQ_PLL_ERROR |
-    DWT_IRQ_RXOK |
-    DWT_IRQ_RXFAILED |
-    DWT_IRQ_RXTIMEOUT
-    , 1
-  );
-}
-
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 /* USER CODE END 0 */
 void SystemClock_Config(void);
 
