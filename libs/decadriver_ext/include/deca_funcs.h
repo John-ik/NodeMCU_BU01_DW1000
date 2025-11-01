@@ -12,9 +12,9 @@
 void dwt_custom_softReset();
 void softreset_receiver();
 
-uint64_t get_sys_ts();
-uint64_t get_rx_ts();
-uint64_t get_tx_ts();
+int64_t get_sys_ts();
+int64_t get_rx_ts();
+int64_t get_tx_ts();
 
 uint32 dwt_get_status();
 void dwt_reset_status(uint32 status);

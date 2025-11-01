@@ -41,8 +41,6 @@
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16436
 #define RX_ANT_DLY 16436
-// #define TX_ANT_DLY 0
-// #define RX_ANT_DLY 32950
 
 dwt_config_t config =
 {

@@ -101,8 +101,8 @@ void trace_msg(uint8 msg[]){
   uint8 msg_type = MSG_TYPE(msg);
   uint8 msg_len = msgGetLen(msg_type);
 
-  uint64_t tx_ts = get_tx_ts();
-  uint64_t rx_ts = get_rx_ts();
+  int64_t tx_ts = get_tx_ts();
+  int64_t rx_ts = get_rx_ts();
   int printed = 0;
   for(size_t i = 0; i < msg_len; i++){
         printed = snprintf(buf, buf_size, "%02X", msg[i]);
@@ -262,15 +262,13 @@ void toIdle(){
 }
 
 void step(MsgEvent event){
-  uint64_t sys_ts = 0, rx_ts = 0;
-  uint64_t pull_rx_ts = 0, resp_tx_ts = 0;
-  uint64_t req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
+  int64_t pull_rx_ts = 0, resp_tx_ts = 0;
+  int64_t req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
 
   switch(state){
     case STATE_Receive:
       switch(event){
         case EVENT_initiate_pull_one: // in STATE_Receive
-          // led_signal(2);
           toIdle();
           dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
           dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
@@ -283,16 +281,13 @@ void step(MsgEvent event){
           state = STATE_Pull_one; // mutate state
 
           sendtx(msg_pull_one, MSG_PULL_ONE_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
-          // while( ! flag_send){} // ждём завершения отправки
           TRACE_MSG(msg_pull_one);
           return;
 
         case EVENT_msg_PULL_ONE: // in STATE_Receive
-          // led_signal(3);
           toIdle();
 
           pull_rx_ts = get_rx_ts();
-          // static uint64_t pull_one4resp_delay = 1;
           resp_tx_ts = (pull_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32) (resp_tx_ts >> 8) );
           //? set rx timreout and rxaftertxdelay
@@ -312,7 +307,6 @@ void step(MsgEvent event){
             return;
           }
           
-          // while( ! flag_send){} // ждём завершения отправкиы
           TRACE_MSG(msg_resp_one);
           toReceive();
           return;
