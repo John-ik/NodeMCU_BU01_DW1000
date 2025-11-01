@@ -50,13 +50,22 @@ extern uint8_t msg_resp_one[];
 #define MSG_SRC_ID(msg)  (*((uint16_t*) &msg[7])) //! тут вообще-то должен получаться невыровненый доступ
 #define MSG_TYPE(msg)    (msg[9])
 
-//! раньше была ошибка невыровненного доступа
 #define MSG_RESP_ONE_pull_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
 #define MSG_RESP_ONE_pull_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
 #define MSG_RESP_ONE_resp_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)
 #define MSG_RESP_ONE_resp_tx_ts_set(msg, src_p) memcpy(&msg[15], src_p, 5)
 
-
+/*
+!           Про невыровненый доступ
+! STM32F10xxx/20xxx/21xxx/L1xxxx Cortex®-M3 programming manual 3.3.5 [Address alignment]
+! инструкция LDRH которая используется для доступа в uin16_t (PAN/DEST/SRC ID)
+! поддерживает невыровненый доступ.
+! Однако, LDRD требуется выравнивание (исп для 64 битных), поэтому возникала ошибка.
+! Сейчас решена, т.к. исп memcpy.
+!
+! TODO: т.к. невыровненый доступ это медленнее и то что он вообще допустим не гарантировано
+! стоит исправить.
+*/
 
 
 #define EVENTs_msg    0x1000
