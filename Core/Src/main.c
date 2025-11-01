@@ -71,7 +71,8 @@
 /* USER CODE BEGIN PV */
 #define UART_BUF_len 512
 char uart_buf[UART_BUF_len]; 
-char DEBUG_uart_buf[630]; 
+char DEBUG_uart_buf[630];
+uint32 DEBUG_sys_ts;
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -92,9 +93,36 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 
+/* USER CODE BEGIN 0 */
+
+void trace_msg(uint8 msg[]){
+  char *buf = uart_buf;
+  size_t buf_size = UART_BUF_len;
+  uint8 msg_type = MSG_TYPE(msg);
+  uint8 msg_len = msgGetLen(msg_type);
+
+  uint64 tx_ts = get_tx_ts();
+  uint64 rx_ts = get_rx_ts();
+  int printed = 0;
+  for(size_t i = 0; i < msg_len; i++){
+        printed = snprintf(buf, buf_size, "%02X", msg[i]);
+        buf += printed;
+        buf_size -= printed;
+  }
+  DEBUG_transmit_fmt("TRACE: 0x%02X%08lX 0x%02X%08lX %s", 
+    (uint8)(tx_ts >> 32),  (uint32) tx_ts,
+    (uint8)(rx_ts >> 32),  (uint32) rx_ts,
+    uart_buf
+  );
+}
+#ifdef TRACE_MSG_ON
+  #define TRACE_MSG(msg) trace_msg(msg)
+#else
+  #define TRACE_MSG(msg) do {} while(0)
+#endif
+
 #define RANGING_ON 1
 #define RANGING_OFF 0
-/* USER CODE BEGIN 0 */
 /*! @brief 
  @param[in] msg массив байтов представляющий собой сообщение
  @param[in] tx_mode pass to `dwt_starttx`
@@ -189,11 +217,11 @@ void init_irq(){
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 // ------------------------------ STATE ------------------------------
 
-
-#define STATE_none     0
-#define STATE_Receive  1
-#define STATE_Pull_one 2
-typedef uint32 State;
+typedef enum {
+  STATE_none     = 0,
+  STATE_Receive  = 1,
+  STATE_Pull_one = 2
+} State;
 static State state = STATE_none;
 
 char* showState(State state){
@@ -234,9 +262,9 @@ void toIdle(){
 }
 
 void step(MsgEvent event){
-  uint64 sys_ts, rx_ts;
-  uint64 pull_rx_ts, resp_tx_ts;
-  uint64 req_tx_ts, ans_rx_ts, ans_tx_ts, req_rx_ts;
+  uint64 sys_ts = 0, rx_ts = 0;
+  uint64 pull_rx_ts = 0, resp_tx_ts = 0;
+  uint64 req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
 
   switch(state){
     case STATE_Receive:
@@ -255,7 +283,8 @@ void step(MsgEvent event){
           state = STATE_Pull_one; // mutate state
 
           sendtx(msg_pull_one, MSG_PULL_ONE_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
-          while( ! flag_send){} // ждём завершения отправки
+          // while( ! flag_send){} // ждём завершения отправки
+          TRACE_MSG(msg_pull_one);
           return;
 
         case EVENT_msg_PULL_ONE: // in STATE_Receive
@@ -283,25 +312,13 @@ void step(MsgEvent event){
             return;
           }
           
-          while( ! flag_send){} // ждём завершения отправки
-
-          sys_ts = get_sys_ts();
-          showMsg(uart_buf, UART_BUF_len, msg_resp_one);
-          DEBUG_transmit_fmt("sended: %s, err = %d, systime = 0x%X00", uart_buf, err, (uint32) sys_ts >> 8);
-
+          // while( ! flag_send){} // ждём завершения отправкиы
+          TRACE_MSG(msg_resp_one);
+          toReceive();
           return;
 
         default: // in STATE_Receive
-          // dump all not supported RX msg
-          sys_ts = get_sys_ts();
-          rx_ts = get_rx_ts();
-          showMsg(uart_buf, UART_BUF_len, rx_buffer);
-          sprintf(DEBUG_uart_buf, "0x%02X%08lX: %s at 0x%02X%08lX\n",
-            (uint8)(sys_ts >> 32), (uint32) sys_ts,
-            uart_buf,
-            (uint8)(rx_ts >> 32), (uint32) rx_ts
-          );
-          Transmit(DEBUG_uart_buf);
+          trace_msg(rx_buffer);
           toReceive();
           return;
       }
@@ -320,6 +337,8 @@ void step(MsgEvent event){
           DEBUG_transmit_fmt("frame_seq_nb = %u\nreq_tx = %f, req_rx = %f, ans_tx = %f, ans_rx = %f, dist: %f m",
                   frame_seq_nb - 1,    
                   (float) req_tx_ts, (float) req_rx_ts, (float) ans_tx_ts, (float) ans_rx_ts, dist);
+
+          TRACE_MSG(rx_buffer);
 
           toReceive();
           state = STATE_Receive; // state mutate
@@ -381,10 +400,10 @@ int main(void)
   // HAL_Delay(100);
   
   
-  DEBUG_transmit_str("starting");
-  DEBUG_transmit_fmt("0x%X", dwt_readdevid());
+  // DEBUG_transmit_str("starting");
+  // DEBUG_transmit_fmt("0x%lX", dwt_readdevid());
   while (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR){
-    DEBUG_transmit_str("ERRORO");
+    // DEBUG_transmit_str("ERRORO");
     reset_DW1000();
   }
   spi_full_speed();
@@ -435,7 +454,7 @@ int main(void)
   init_irq();
   
   uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
-  DEBUG_transmit_fmt("Sys_cfg = 0x%X; Status = 0x%X", cfg, dwt_get_status());
+  DEBUG_transmit_fmt("Sys_cfg = 0x%lX; Status = 0x%lX", cfg, dwt_get_status());
 
 
   // INITIAL STATE
@@ -503,12 +522,6 @@ int main(void)
       saved_event = EVENT_none;
     }
 
-    if (event){
-      DEBUG_transmit_fmt("BEFORE: event = %s, saved_event = %s, state = %s, status = 0x%X, seq = %u",
-        showEvent(event), showEvent(saved_event), showState(state), dwt_get_status(), frame_seq_nb
-      );
-    }
-
     { // Aka server event
       // EVENT_rxtimeout processing in step
 
@@ -535,8 +548,6 @@ int main(void)
     // All for msg protocols
     if (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || (event == EVENT_rxtimeout)){
       step(event);
-
-      DEBUG_transmit_fmt("AFTER STEP: state = %s; status = 0x%X", showState(state), dwt_read32bitreg(SYS_STATUS_ID));
     }
   }
   /* USER CODE END 3 */

@@ -1,8 +1,8 @@
 #pragma once
 
 // Indexing TAGs and Anchor from 1. 0 is special
-// #define TAG
-#define ANCHOR
+#define TAG
+// #define ANCHOR
 
 #define MY_PAN_ID 0x0010 // ID of network
 
@@ -35,6 +35,8 @@
 
 #define DEBUG_DWT_DIAG
 #define DEBUG_DWT_DIAG_TIMEOUT 10000
+
+#define TRACE_MSG_ON
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16436
@@ -96,22 +98,22 @@ dwt_config_t config =
 
 // ==================== PROTOLOCS CONFIG ====================
 
-#define DEFAULT_RX_TIMEOUT_UUS      1000
+#define DEFAULT_RX_TIMEOUT_UUS      500
 
 #define INITIATE_PULL_ONE_TIMEOUT_MS 5000
 
 
 /// инициация со стороны тэга и теперь тэг ждет столько до начала RX чтобы поймать RESP
-#define POLL_TX_TO_RESP_RX_DLY_UUS  5000uLL
+#define POLL_TX_TO_RESP_RX_DLY_UUS  2000uLL
 /// якорь поймал POLL и отправит RESP через
-#define POLL_RX_TO_RESP_TX_DLY_UUS  5250uLL
+#define POLL_RX_TO_RESP_TX_DLY_UUS  2100uLL
 /// тэг ждёт в течении
 #define RESP_RX_TIMEOUT_UUS         DEFAULT_RX_TIMEOUT_UUS
 
 /// якорь ждет после RESP чтобы начать RX для FINAL
-#define RESP_TX_TO_FINAL_RX_DLY_UUS 5000uLL
+#define RESP_TX_TO_FINAL_RX_DLY_UUS 2000uLL
 /// тэг поймал RESP и отправит FINAL через
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 5250uLL
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 21000uLL
 /// якорь ждёт
 #define FINAL_RX_TIMEOUT_UUS        DEFAULT_RX_TIMEOUT_UUS
 

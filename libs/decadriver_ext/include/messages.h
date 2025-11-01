@@ -4,7 +4,6 @@
 #include "stdio.h"
 #include "string.h" /* memcpy */
 
-#include "deca_types.h"
 #include "deca_regs.h"
 
 typedef enum {
@@ -38,17 +37,17 @@ typedef enum {
 #define MSG_CRC_len 2
 
 #define MSG_PULL_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + MSG_CRC_len)
-extern uint8 msg_pull_one[];
+extern uint8_t msg_pull_one[];
 #define MSG_RESP_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
-extern uint8 msg_resp_one[];
+extern uint8_t msg_resp_one[];
 
 #define MSG_MAX_LEN MSG_RESP_ONE_len
 
 
 #define MSG_SEQNUM(msg)  (msg[2])
-#define MSG_PAN_ID(msg)  (*((uint16*) &msg[3])) //! тут вообще-то должен получаться невыровненый доступ
-#define MSG_DEST_ID(msg) (*((uint16*) &msg[5]))
-#define MSG_SRC_ID(msg)  (*((uint16*) &msg[7])) //! тут вообще-то должен получаться невыровненый доступ
+#define MSG_PAN_ID(msg)  (*((uint16_t*) &msg[3])) //! тут вообще-то должен получаться невыровненый доступ
+#define MSG_DEST_ID(msg) (*((uint16_t*) &msg[5]))
+#define MSG_SRC_ID(msg)  (*((uint16_t*) &msg[7])) //! тут вообще-то должен получаться невыровненый доступ
 #define MSG_TYPE(msg)    (msg[9])
 
 //! раньше была ошибка невыровненного доступа
@@ -96,9 +95,11 @@ typedef enum{
     EVENT_pll_error = EVENTs_dwt | 0xAA,
 } MyEvents;
 
-typedef uint16 MsgEvent; // MyEvents | MSG_TYPE
+typedef uint16_t MsgEvent; // MyEvents | MSG_TYPE
 
-MsgEvent toMsgEvent(uint32 status, uint8 msg_type, MyEvents ext);
+uint8_t msgGetLen(MSG_Types msg_type);
+
+MsgEvent toMsgEvent(uint32_t status, uint8_t msg_type, MyEvents ext);
 
 char* showEvent(MyEvents event);
 
@@ -114,4 +115,4 @@ MSG <TYPE>
 
 @param str_size используется в snprintf
 */
-void showMsg(char* str, size_t str_size, uint8 msg[]);
+void showMsg(char* str, size_t str_size, uint8_t msg[]);
