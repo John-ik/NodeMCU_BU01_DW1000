@@ -226,6 +226,8 @@ typedef enum {
 } State;
 static State state = STATE_none;
 
+static uint16 frame_filter = DWT_FF_DATA_EN;
+
 char* showState(State state){
   switch (state)
   {
@@ -290,6 +292,7 @@ void step(MsgEvent event){
           toIdle();
           dwt_setrxtimeout(0);
           dwt_setsniffmode(1, SNIFF_ON_TIME, SNIFF_OFF_TIME); // настройка режима сниффера
+          dwt_enableframefilter(DWT_FF_NOTYPE_EN); // вырубаем фильтрацию, т.к. слушаем всё
           state = STATE_Sniffer;
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
@@ -364,6 +367,7 @@ void step(MsgEvent event){
       }else{
         state = STATE_Receive; // state mutate
         dwt_setsniffmode(0, 0, 0); // выключение сниффера
+        dwt_enableframefilter(frame_filter); // врубаем фильтрацию обратно
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
       return;
@@ -461,8 +465,13 @@ int main(void)
   // PRINT WHO IS WHO
   DEBUG_transmit_fmt("I am a %s", whoami);
 
+  // Настройка PAN_ID и SHORT_ADDR
+  // нужна для работы фильтра
+  dwt_setpanid(MY_PAN_ID);
+  dwt_setaddress16(my_addr);
+
   // Confifure filtering
-  // dwt_enableframefilter(DWT_FF_DATA_EN);
+  // dwt_enableframefilter(frame_filter); //! пока что что-то идет не так
   
   dwt_configeventcounters(1); // enalbe counters for diagnostics
   
@@ -550,8 +559,9 @@ int main(void)
         }
       }
 
-      if (event == EVENT_rxfail){
-        dwt_rxenable(0); // start RX
+      if (event == EVENT_rxfail){ // сюда не относиться rx_timeout
+        dwt_rxenable(0); // re-enable RX
+        //? всегда ли надо re-enable ?
         //TODO: отправка пакета об ошибке,
         state = STATE_Receive;
       }
