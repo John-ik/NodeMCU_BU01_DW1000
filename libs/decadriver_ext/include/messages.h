@@ -83,6 +83,7 @@ typedef enum{
     // ------------------------- CUSTOM -------------------------
 
     EVENT_initiate_pull_one = EVENTs_custom | 0x0,
+    EVENT_initiate_sniffer  = EVENTs_custom | 0xf0,
     
     // ------------------------- HOST -------------------------
     

@@ -220,7 +220,9 @@ void init_irq(){
 typedef enum {
   STATE_none     = 0,
   STATE_Receive  = 1,
-  STATE_Pull_one = 2
+  STATE_Pull_one = 2,
+
+  STATE_Sniffer  = 0xf0
 } State;
 static State state = STATE_none;
 
@@ -284,6 +286,14 @@ void step(MsgEvent event){
           TRACE_MSG(msg_pull_one);
           return;
 
+        case EVENT_initiate_sniffer: // in STATE_Receive
+          toIdle();
+          dwt_setrxtimeout(0);
+          dwt_setsniffmode(1, SNIFF_ON_TIME, SNIFF_OFF_TIME); // настройка режима сниффера
+          state = STATE_Sniffer;
+          dwt_rxenable(DWT_START_RX_IMMEDIATE);
+          return;
+
         case EVENT_msg_PULL_ONE: // in STATE_Receive
           toIdle();
 
@@ -334,17 +344,29 @@ void step(MsgEvent event){
 
           TRACE_MSG(rx_buffer);
 
-          toReceive();
           state = STATE_Receive; // state mutate
+          dwt_setrxtimeout(0);
+          dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
 
         default: // in STATE_Pull_one
           DEBUG_transmit_str("pull_one: default");
-          toReceive();
           state = STATE_Receive; // state mutate
+          dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
       }
       return; // <-- after switch(event) STATE_Pull_one
+
+    case STATE_Sniffer:
+      if (EVENT_is(event, EVENTs_msg)){
+        trace_msg(rx_buffer);
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+      }else{
+        state = STATE_Receive; // state mutate
+        dwt_setsniffmode(0, 0, 0); // выключение сниффера
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+      }
+      return;
 
     default:
       return;

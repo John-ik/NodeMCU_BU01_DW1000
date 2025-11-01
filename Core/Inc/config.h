@@ -70,9 +70,24 @@ dwt_config_t config =
 #endif
 
 
+/*
+Формула времени передчаи всего сообщения:
+  t = preamblua_len us + sfd_len us + ((19 bit + data_len byte) / data_rate)
 
+для preamblua_len = 128, PRF = 16M => sfd_len = 8, data_len = 127 (макс по стандарту)
+6.8Мбит/с
+= 288 us
+*/
 
 // ==================== PROTOLOCS CONFIG ====================
+
+/* SNIFF mode on/off times.
+ * ON time is expressed in multiples of PAC size (with the IC adding 1 PAC automatically). So the ON time of 1 here gives 2 PAC times and, since the
+ * configuration (above) specifies DWT_PAC8, we get an ON time of 2x8 symbols, or around 16 �s.
+ * OFF time is expressed in multiples of 128/125 �s (~1 �s).
+ * These values will lead to a roughly 50% duty-cycle, each ON and OFF phase lasting for about 16 �s. */
+#define SNIFF_ON_TIME 1   ///< (x + 1) * PACSIZE (~ 1 us)
+#define SNIFF_OFF_TIME 16 ///< ~ 1 us
 
 #define DEFAULT_RX_TIMEOUT_UUS      500
 
