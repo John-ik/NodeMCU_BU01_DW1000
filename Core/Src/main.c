@@ -101,8 +101,8 @@ void trace_msg(uint8 msg[]){
   uint8 msg_type = MSG_TYPE(msg);
   uint8 msg_len = msgGetLen(msg_type);
 
-  uint64 tx_ts = get_tx_ts();
-  uint64 rx_ts = get_rx_ts();
+  uint64_t tx_ts = get_tx_ts();
+  uint64_t rx_ts = get_rx_ts();
   int printed = 0;
   for(size_t i = 0; i < msg_len; i++){
         printed = snprintf(buf, buf_size, "%02X", msg[i]);
@@ -262,9 +262,9 @@ void toIdle(){
 }
 
 void step(MsgEvent event){
-  uint64 sys_ts = 0, rx_ts = 0;
-  uint64 pull_rx_ts = 0, resp_tx_ts = 0;
-  uint64 req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
+  uint64_t sys_ts = 0, rx_ts = 0;
+  uint64_t pull_rx_ts = 0, resp_tx_ts = 0;
+  uint64_t req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
 
   switch(state){
     case STATE_Receive:
@@ -292,12 +292,12 @@ void step(MsgEvent event){
           toIdle();
 
           pull_rx_ts = get_rx_ts();
-          // static uint64 pull_one4resp_delay = 1;
+          // static uint64_t pull_one4resp_delay = 1;
           resp_tx_ts = (pull_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32) (resp_tx_ts >> 8) );
           //? set rx timreout and rxaftertxdelay
 
-          resp_tx_ts = (((uint64)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
+          resp_tx_ts = (((uint64_t)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
           MSG_SEQNUM(msg_resp_one)  = MSG_SEQNUM(rx_buffer);
           MSG_PAN_ID(msg_resp_one)  = MY_PAN_ID;
           MSG_DEST_ID(msg_resp_one) = MSG_SRC_ID(rx_buffer);
