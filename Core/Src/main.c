@@ -220,7 +220,7 @@ void init_irq(){
 typedef enum {
   STATE_none     = 0,
   STATE_Receive  = 1,
-  STATE_Pull_one = 2,
+  STATE_SS_TWR = 2,
 
   STATE_Sniffer  = 0xf0
 } State;
@@ -233,7 +233,7 @@ char* showState(State state){
   {
   case STATE_none:     return "STATE_none";
   case STATE_Receive:  return "STATE_Receive";
-  case STATE_Pull_one: return "STATE_Pull_one";
+  case STATE_SS_TWR: return "STATE_SS_TWR";
   default:
     return "! UNDEFINED STATE !";
   }
@@ -272,20 +272,36 @@ void step(MsgEvent event){
   switch(state){
     case STATE_Receive:
       switch(event){
-        case EVENT_initiate_pull_one: // in STATE_Receive
+        case EVENT_initiate_ss_twr: // in STATE_Receive
           toIdle();
           dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
           dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
-          MSG_SEQNUM(msg_pull_one) = frame_seq_nb++;
-          MSG_PAN_ID(msg_pull_one) = MY_PAN_ID;
-          MSG_DEST_ID(msg_pull_one) = 0xFFFF;
-          MSG_SRC_ID(msg_pull_one)  = my_addr;
+          MSG_SEQNUM(msg_pull) = frame_seq_nb++;
+          MSG_PAN_ID(msg_pull) = MY_PAN_ID;
+          MSG_DEST_ID(msg_pull) = 0xFFFF;
+          MSG_SRC_ID(msg_pull)  = my_addr;
           
-          state = STATE_Pull_one; // mutate state
+          state = STATE_SS_TWR; // mutate state
 
-          sendtx(msg_pull_one, MSG_PULL_ONE_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
-          TRACE_MSG(msg_pull_one);
+          sendtx(msg_pull, MSG_PULL_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          TRACE_MSG(msg_pull);
+          return;
+
+        case EVENT_initiate_ds_twr:
+          toIdle();
+          dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+          dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+
+          MSG_SEQNUM(msg_pull) = frame_seq_nb++;
+          MSG_PAN_ID(msg_pull) = MY_PAN_ID;
+          MSG_DEST_ID(msg_pull) = 0xFFFF;
+          MSG_SRC_ID(msg_pull)  = my_addr;
+          
+          state = STATE_SS_TWR; // mutate state
+
+          sendtx(msg_pull, MSG_PULL_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          TRACE_MSG(msg_pull);
           return;
 
         case EVENT_initiate_sniffer: // in STATE_Receive
@@ -297,7 +313,7 @@ void step(MsgEvent event){
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
 
-        case EVENT_msg_PULL_ONE: // in STATE_Receive
+        case EVENT_msg_PULL: // in STATE_Receive
           toIdle();
 
           pull_rx_ts = get_rx_ts();
@@ -306,21 +322,21 @@ void step(MsgEvent event){
           //? set rx timreout and rxaftertxdelay
 
           resp_tx_ts = (((uint64_t)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
-          MSG_SEQNUM(msg_resp_one)  = MSG_SEQNUM(rx_buffer);
-          MSG_PAN_ID(msg_resp_one)  = MY_PAN_ID;
-          MSG_DEST_ID(msg_resp_one) = MSG_SRC_ID(rx_buffer);
-          MSG_SRC_ID(msg_resp_one)  = my_addr;
-          MSG_RESP_ONE_pull_rx_ts_set(msg_resp_one, &pull_rx_ts);
+          MSG_SEQNUM(msg_resp)  = MSG_SEQNUM(rx_buffer);
+          MSG_PAN_ID(msg_resp)  = MY_PAN_ID;
+          MSG_DEST_ID(msg_resp) = MSG_SRC_ID(rx_buffer);
+          MSG_SRC_ID(msg_resp)  = my_addr;
+          MSG_RESP_ONE_pull_rx_ts_set(msg_resp, &pull_rx_ts);
           // resp_tx_ts += TX_ANT_DLY;
-          MSG_RESP_ONE_resp_tx_ts_set(msg_resp_one, &resp_tx_ts);
+          MSG_RESP_ONE_resp_tx_ts_set(msg_resp, &resp_tx_ts);
 
-          int err = sendtx(msg_resp_one, MSG_RESP_ONE_len, DWT_START_TX_DELAYED, RANGING_ON);
+          int err = sendtx(msg_resp, MSG_RESP_len, DWT_START_TX_DELAYED, RANGING_ON);
           if (err){
             toReceive();
             return;
           }
           
-          TRACE_MSG(msg_resp_one);
+          TRACE_MSG(msg_resp);
           toReceive();
           return;
 
@@ -331,9 +347,9 @@ void step(MsgEvent event){
       }
       return; // after switch(event) <-- STATE_Receive
 
-    case STATE_Pull_one:
+    case STATE_SS_TWR:
       switch(event){
-        case EVENT_msg_RESP_ONE: // in STATE_Pull_one
+        case EVENT_msg_RESP: // in STATE_SS_TWR
           req_tx_ts = get_tx_ts();
           ans_rx_ts = get_rx_ts();
           MSG_RESP_ONE_resp_tx_ts_get(rx_buffer, &ans_tx_ts);
@@ -352,13 +368,13 @@ void step(MsgEvent event){
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
 
-        default: // in STATE_Pull_one
+        default: // in STATE_SS_TWR
           DEBUG_transmit_str("pull_one: default");
           state = STATE_Receive; // state mutate
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
       }
-      return; // <-- after switch(event) STATE_Pull_one
+      return; // <-- after switch(event) STATE_SS_TWR
 
     case STATE_Sniffer:
       if (EVENT_is(event, EVENTs_msg)){
@@ -507,7 +523,7 @@ int main(void)
         static uint32 timer_pull_one = 0; 
         if (HAL_GetTick() - timer_pull_one > INITIATE_PULL_ONE_TIMEOUT_MS){
           timer_pull_one = HAL_GetTick();
-          event = EVENT_initiate_pull_one;
+          event = EVENT_initiate_ss_twr;
         }
       #endif
 

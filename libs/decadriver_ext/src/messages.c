@@ -3,8 +3,9 @@
 #define MSG_BEGIN MSG_HEADER_normal
 #define MSG_END   MSG_PLACEHOLDER_CRC
 
-uint8_t msg_pull_one[MSG_PULL_ONE_len] = {MSG_BEGIN, MSG_PULL_ONE, MSG_END};
-uint8_t msg_resp_one[MSG_RESP_ONE_len] = {MSG_BEGIN, MSG_RESP_ONE, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
+uint8_t msg_pull[MSG_PULL_len]   = {MSG_BEGIN, MSG_PULL, MSG_END};
+uint8_t msg_resp[MSG_RESP_len]   = {MSG_BEGIN, MSG_RESP, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
+uint8_t msg_final[MSG_FINAL_len] = {MSG_BEGIN, MSG_FINAL, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
 
 #undef MSG_BEGIN
 #undef MSG_END
@@ -12,8 +13,11 @@ uint8_t msg_resp_one[MSG_RESP_ONE_len] = {MSG_BEGIN, MSG_RESP_ONE, MSG_PLACEHOLD
 uint8_t msgGetLen(MSG_Types msg_type){
     switch(msg_type){
 #define X(x) case x: return x##_len
-        X(MSG_PULL_ONE);
-        X(MSG_RESP_ONE);
+        case MSG_PULL_3:
+        X(MSG_PULL);
+        case MSG_RESP_3:
+        X(MSG_RESP);
+        X(MSG_FINAL);
 #undef X
         default:
             return 0;
@@ -37,14 +41,14 @@ char* showEvent(MyEvents event){
     switch(event){
         case EVENT_none:              return "EVENT_none";
         
-        case EVENT_msg_PULL_ONE: return "EVENT_msg_pull_one";
-        case EVENT_msg_RESP_ONE: return "EVENT_msg_resp_one";
-        case EVENT_msg_PULL:     return "EVENT_msg_pull";
-        case EVENT_msg_RESPONSE: return "EVENT_msg_response";
+        case EVENT_msg_PULL: return "EVENT_msg_pull";
+        case EVENT_msg_RESP: return "EVENT_msg_resp";
+        case EVENT_msg_PULL_3:     return "EVENT_msg_pull_3";
+        case EVENT_msg_RESP_3: return "EVENT_msg_resp_3";
         case EVENT_msg_FINAL:    return "EVENT_msg_final";
         case EVENT_msg_DISTANCE: return "EVENT_msg_distance";
         
-        case EVENT_initiate_pull_one: return "EVENT_initiate_pull_one";
+        case EVENT_initiate_ss_twr: return "EVENT_initiate_ss_twr";
         
         case EVENT_rxtimeout:         return "EVENT_rxtimeout";
         
@@ -58,10 +62,10 @@ char* showEvent(MyEvents event){
 
 char* showMsgType(MSG_Types type){
     switch(type){
-        case MSG_PULL_ONE: return "MSG_pull_one";
-        case MSG_RESP_ONE: return "MSG_resp_one";
-        case MSG_PULL:     return "MSG_pull";
-        case MSG_RESPONSE: return "MSG_response";
+        case MSG_PULL: return "MSG_pull";
+        case MSG_RESP: return "MSG_resp";
+        case MSG_PULL_3:     return "MSG_pull_3";
+        case MSG_RESP_3: return "MSG_resp_3";
         case MSG_FINAL:    return "MSG_final";
         case MSG_DISTANCE: return "MSG_distance";
     }
@@ -88,9 +92,9 @@ void showMsg(char* str, size_t str_size, uint8_t msg[]){
     static uint64_t pull_rx_ts, resp_tx_ts;
 
     switch(msg_type){
-        case MSG_PULL_ONE:
+        case MSG_PULL:
             break;
-        case MSG_RESP_ONE:
+        case MSG_RESP:
             MSG_RESP_ONE_pull_rx_ts_get(msg, &pull_rx_ts);
             MSG_RESP_ONE_resp_tx_ts_get(msg, &resp_tx_ts);
     #if __IMPORTC__

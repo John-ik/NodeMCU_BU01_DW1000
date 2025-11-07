@@ -7,12 +7,12 @@
 #include "deca_regs.h"
 
 typedef enum {
-    MSG_PULL_ONE = 0x01,
-    MSG_RESP_ONE = 0x02,
-    MSG_PULL     = 0x11,
-    MSG_RESPONSE = 0x22,
-    MSG_FINAL    = 0x33,
-    MSG_DISTANCE = 0x44,
+    MSG_PULL       = 0x11, ///< протокол 2-смс
+    MSG_RESP       = 0x12, ///< протокол 2-смс
+    MSG_PULL_3     = 0x21, ///< протокол 3-смс
+    MSG_RESP_3     = 0x22, ///< протокол 3-смс
+    MSG_FINAL      = 0x13, ///< протокол 3-смс
+    MSG_DISTANCE   = 0x44
 } MSG_Types;
 
 #define MSG_PLACEHOLDER_8  0
@@ -36,12 +36,14 @@ typedef enum {
 #define MSG_PLACEHOLDER_CRC MSG_PLACEHOLDER_16
 #define MSG_CRC_len 2
 
-#define MSG_PULL_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + MSG_CRC_len)
-extern uint8_t msg_pull_one[];
-#define MSG_RESP_ONE_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
-extern uint8_t msg_resp_one[];
+#define MSG_PULL_len (MSG_HEADER_normal_len + MSG_TYPE_len + MSG_CRC_len)
+extern uint8_t msg_pull[];
+#define MSG_RESP_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
+extern uint8_t msg_resp[];
+#define MSG_FINAL_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
+extern uint8_t msg_final[];
 
-#define MSG_MAX_LEN MSG_RESP_ONE_len
+#define MSG_MAX_LEN MSG_RESP_len
 
 
 #define MSG_SEQNUM(msg)  (msg[2])
@@ -82,16 +84,17 @@ typedef enum{
 
     // ------------------------- MSG -------------------------
 
-    EVENT_msg_PULL_ONE = EVENTs_msg | MSG_PULL_ONE,
-    EVENT_msg_RESP_ONE = EVENTs_msg | MSG_RESP_ONE,
     EVENT_msg_PULL     = EVENTs_msg | MSG_PULL,
-    EVENT_msg_RESPONSE = EVENTs_msg | MSG_RESPONSE,
+    EVENT_msg_RESP     = EVENTs_msg | MSG_RESP,
+    EVENT_msg_PULL_3   = EVENTs_msg | MSG_PULL_3,
+    EVENT_msg_RESP_3   = EVENTs_msg | MSG_RESP_3,
     EVENT_msg_FINAL    = EVENTs_msg | MSG_FINAL,
     EVENT_msg_DISTANCE = EVENTs_msg | MSG_DISTANCE,
 
     // ------------------------- CUSTOM -------------------------
 
-    EVENT_initiate_pull_one = EVENTs_custom | 0x0,
+    EVENT_initiate_ss_twr = EVENTs_custom | 0x1,
+    EVENT_initiate_ds_twr = EVENTs_custom | 0x2,
     EVENT_initiate_sniffer  = EVENTs_custom | 0xf0,
     
     // ------------------------- HOST -------------------------
