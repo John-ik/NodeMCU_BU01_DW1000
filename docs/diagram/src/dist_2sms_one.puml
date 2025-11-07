@@ -18,6 +18,6 @@ note right
     Сохр resp_tx_ts
 end note
 note over Tag
-    (pull_tx_ts - resp_rx_ts) - (resp_tx_ts - pull_rx_ts)
+    (resp_rx_ts - pull_tx_ts) - (resp_tx_ts - pull_rx_ts)
 end note
 @enduml
