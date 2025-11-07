@@ -1,8 +1,46 @@
 @startuml dist_3sms_both
 
-Tag -> Anchor: Pull
-Anchor -> Tag: Response
-Tag -> Anchor: Final
-Anchor -> Tag: Distance
+title Точный протокол измерения расстояния
+
+Tag ->(20) Anchor: Pull
+note left: pull_t
+note right: pull_r
+
+Anchor ->(20) Tag: Response\n(pull_r, resp_t)
+note right: resp_t
+note left: resp_r
+
+Tag ->(20) Anchor: Final\n(resp_r, final_t)
+note left: final_t
+note right: final_r
+
+opt Если Тэгу надо расстояние
+    Anchor ->(20) Tag: Distance(dist)
+    note right: Вычисления
+end
+
+note over Anchor, Tag
+<latex>T_{round1} = resp_r - pull_t  </latex>
+<latex>T_{reply1} = resp_t - pull_r  </latex>
+<latex>T_{reply2} = final_t - resp_r </latex>
+<latex>T_{round2} = final_r - resp_t </latex>
+end note
+
+note over Anchor, Tag
+Ассиметричный:
+<latex>
+    Tof =
+\frac{T_{round1} \cdot T_{round2} - T_{reply1} \cdot T_{reply2}}
+{T_{round1} + T_{round2} + T_{reply1} + T_{reply2}}
+</latex>
+end note
+
+note over Anchor, Tag
+Симетричный:
+<latex>T_{reply1} \approx T_{reply2}</latex>
+<latex>
+Tof = \frac{T_{round1} - T_{reply2} + T_{round2} - T_{reply1}}{4}
+</latex>
+end note
 
 @enduml

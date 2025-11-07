@@ -1,21 +1,23 @@
 @startuml dist_2sms_one
 
-Tag ->(20) Anchor : Pull_One
+title Простой протокол на двух смс, возможны сильные погрешности
+
+Tag ->(20) Anchor : Pull_SS
 note left 
-    Сохр req_tx_ts
+    Сохр pull_tx_ts
 end note
 note right
-    Сохр req_rx_ts
+    Сохр pull_rx_ts
 end note
 
-Anchor ->(20) Tag : Response_One (req_rx_ts, ans_tx_ts)
+Anchor ->(20) Tag : Response_SS\n(pull_rx_ts, resp_tx_ts)
 note left
-    Сохр ans_rx_ts
+    Сохр resp_rx_ts
 end note
 note right
-    Сохр ans_tx_ts
+    Сохр resp_tx_ts
 end note
 note over Tag
-    (req_rx_ts - ans_rx_ts) - (req_rx_ts - ans_tx_ts)
+    (pull_tx_ts - resp_rx_ts) - (resp_tx_ts - pull_rx_ts)
 end note
 @enduml
