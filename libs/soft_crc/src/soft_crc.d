@@ -3,73 +3,68 @@ module soft_crc;
 
 Refs: каталог CRC: https://reveng.sourceforge.io/crc-catalogue/all.htm
 +/
-
 import std.typecons : Flag, No, Yes;
+import std.traits : isIntegral;
+
+
+T reflect(ubyte w, T)(T x) @safe pure nothrow @nogc
+if (isIntegral!T)
+{
+    // from boost::crc::reflect_unsigned
+    for (T l = 1u, h = cast(T)(l << (w - 1)) ; h > l ; h >>= 1, l <<= 1 )
+    {
+        const T m = h | l, t = x & m;
+
+        if ( (t == h) || (t == l) )
+            x ^= m;
+    }
+    return x;
+}
+
+unittest{
+    assert(reflect!2(1) == 0b10);
+    assert(reflect!3(1) == 0b100);
+    assert(reflect!5(0b101) == 0b10100);
+    assert(reflect!8(1 << 7) == 1);
+    assert(reflect!8(0xF0) == 0x0F);
+    assert(reflect!16(0xF0_F0) == 0x0F_0F);
+    assert(reflect!32(0xF0_F0_F0_F0) == 0x0F_0F_0F_0F);
+}
+
 
 pure nothrow @nogc
-template crc(T, T Polynom, Flag!"Refin" Refin = No.Refin /* , bool Refout = false */)
+template crc(T, T Polynom, Flag!"Refin" Refin = No.Refin, Flag!"Refout" Refout = No.Refout)
 if(is(T == ubyte) || is(T == ushort) || is(T == uint))
 {
     enum CRCsize = T.sizeof * 8;
-    enum isCRC_8 = CRCsize == 8;
-    enum MSB = 1 << (CRCsize - 1);
-
-    static if (Refin){
-        T reflect(T x)
-        {
-            // from boost::crc::reflect_unsigned
-            for (T l = 1u, h = cast(T)(l << (CRCsize - 1)) ; h > l ; h >>= 1, l <<= 1 )
-            {
-                const T m = h | l, t = x & m;
-
-                if ( (t == h) || (t == l) )
-                    x ^= m;
-            }
-            return x;
-        }
-
-        unittest{
-            assert(reflect(MSB) == 1);
-            static if(is(T == ubyte)){
-                assert(reflect(0xF0) == 0x0F);
-                assert(false == __traits(compiles, reflect(ubyte.max + 1)));
-            }else static if (is(T == ushort)){
-                assert(reflect(0xF0_F0) == 0x0F_0F);
-                assert(false == __traits(compiles, reflect(ushort.max + 1)));
-            }else static if (is(T == uint)){
-                assert(reflect(0xF0_F0_F0_F0) == 0x0F_0F_0F_0F);
-                assert(false == __traits(compiles, reflect(uint.max + 1L))); // suffix L важен
-            }
-        }
-    }
-
-    static if(Refin && is(T == ubyte)){
-        enum P = reflect(Polynom); /// Polynom, если Refin и CRC-8 то перевернутый
-    } else
-        enum P = Polynom;
+    enum DataShift = CRCsize - 8;
+    enum bool isCRC_8 = CRCsize == 8;
+    enum T MSB = 1 << (CRCsize - 1);
+    
 
     version(CRC_No_Table)
     {
-        T crc(T crc, scope const (ubyte)* p_data, size_t size)
+        T crc(T init, scope const (ubyte)* p_data, size_t size)
         {
+            T reg = init;
             while(size--){
                 ubyte d = *(p_data++);
-                static if (Refin && !is(T == ubyte))
-                    d = reflect(d);
 
-                static if(isCRC_8)
-                    crc ^= d;
-                else
-                    crc ^= d << 8;
+                static if(Refin) d = reflect!8(d);
 
-                foreach(_; 0..8){
-                    static if(Refin)
-                        crc = (crc & 1 ? (crc >> 1) ^ P : crc >> 1);
+                reg ^= (d << DataShift);
+
+                foreach(_; 0..8){ // деление на Polynom (mod 2)
+                    if (reg & MSB)
+                        reg = cast(T)(reg << 1) ^ Polynom;
                     else
-                        crc = cast(ubyte)(crc & MSB ? (crc << 1) ^ P : crc << 1);
+                        reg <<= 1;
                 }
             }
-            return crc;
+            static if (Refout)
+                return reflect!(CRCsize)(reg);
+            else
+                return reg;
         }
     }
     else
@@ -80,21 +75,27 @@ if(is(T == ubyte) || is(T == ushort) || is(T == uint))
             // в objdump она не отображается
             // с таблицей даже размер text в бинарнике меньше
             T[256] t = void;
-            foreach (T x; 0..256) {
-                T crc = x;
+            foreach (ubyte x; 0..256) {
+                static if (Refin)
+                    T crc = reflect!8(x) << (CRCsize - 8);
+                else
+                    T crc = x << (CRCsize - 8); // свдиг на 0 же оптимизурется, верно?
                 foreach (_; 0..8) {
-                    static if(Refin)
-                        crc = (crc & 1) ? (crc >> 1) ^ P : crc >> 1;
-                    else
-                        crc = cast(ubyte)(crc & MSB ? (crc << 1) ^ P : crc << 1);
+                    crc = cast(ubyte)(crc & MSB ? (crc << 1) ^ Polynom : crc << 1);
                 }
-                t[x] = crc;
+                static if (Refin)
+                    t[x] = reflect!CRCsize(crc);
+                else
+                    t[x] = crc;
             }
             return t;
         }();
 
         T crc(T crc, scope const(ubyte)* p_data, size_t size)
         {
+            static if(Refin)
+                crc = reflect!CRCsize(crc);
+
             while(size--){
                 static if(isCRC_8)
                     crc = table[crc ^ *(p_data++)];
@@ -102,10 +103,13 @@ if(is(T == ubyte) || is(T == ushort) || is(T == uint))
                     static if(Refin)
                         crc = (crc >> 8) ^ table[cast(ubyte)(crc & 0xFF) ^ *(p_data++)];
                     else
-                        crc = cast(T)(crc << 8) ^ table[(crc >> (CRCsize - 8)) ^ *(p_data++)];
+                        crc = cast(T)(crc << 8) ^ table[cast(ubyte)((crc >> (CRCsize - 8)) & 0xFF ) ^ *(p_data++)];
                 }
             }
-            return crc;
+            static if (Refout)
+                return reflect!CRCsize(crc);
+            else
+                return crc;
         }
     }
 }
@@ -131,8 +135,6 @@ version(unittest){
 
     struct CRC_unit {
         string name;
-        size_t polynom;
-        string comment;
     }
 
     version(D_BetterC)
@@ -158,7 +160,7 @@ unittest
 }
 
 
-@CRC_unit("CRC-8", 0x31, "from SHT20")
+@CRC_unit("CRC-8") // from SHT20
 unittest
 {
     alias crc8_31 = crc!(ubyte, 0x31);
@@ -181,37 +183,43 @@ unittest
     }
 }
 
-@CRC_unit("CRC-8/NRSC-5", 0x31)
+@CRC_unit("CRC-8/NRSC-5")
 unittest
 {
     assert(crc!(ubyte, 0x31)(0xFF, check.ptr, check.length) == 0xF7); // CRC-8/NRSC-5 в каталоге
 }
 
-@CRC_unit("CRC-8/CDMA2000", 0x9b)
+@CRC_unit("CRC-8/CDMA2000")
 unittest
 {
     assert(crc!(ubyte, 0x9b)(0xFF, check.ptr, check.length) == 0xda);
 }
 
-@CRC_unit("CRC-8/DVB-S2", 0xd5)
+@CRC_unit("CRC-8/DVB-S2")
 unittest
 {
     assert(crc!(ubyte, 0xd5)(0, check.ptr, check.length) == 0xbc);
 }
 
-@CRC_unit("CRC-8/BLUETOOTH", 0xA7)
+@CRC_unit("CRC-8/BLUETOOTH")
 unittest
 {
-    assert(crc!(ubyte, 0xa7, Yes.Refin)(0, check.ptr, check.length) == 0x26);
+    assert(crc!(ubyte, 0xa7, Yes.Refin, Yes.Refout)(0, check.ptr, check.length) == 0x26);
 }
 
-// @CRC_unit("CRC-16/GSM", 0x1021)
+@CRC_unit("CRC-8/DARC")
+unittest
+{
+    assert(crc!(ubyte, 0x39, Yes.Refin, Yes.Refout)(0, check.ptr, check.length) == 0x15);
+}
+
+// @CRC_unit("CRC-16/GSM")
 // unittest
 // {
 //     assert((crc!(ushort, 0x1021)(0, check.ptr, check.length) ^ 0xFFFF) == 0xCE3C);
 // }
 
-@CRC_unit("CRC-16/AUG-CCITT", 0x1021)
+@CRC_unit("CRC-16/AUG-CCITT")
 unittest
 {
     assert(crc!(ushort, 0x1021)(0x1d0f, check.ptr, check.length) == 0xe5cc);
