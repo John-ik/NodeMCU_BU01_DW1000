@@ -4,11 +4,11 @@ module soft_crc;
 Refs: каталог CRC: https://reveng.sourceforge.io/crc-catalogue/all.htm
 +/
 import std.typecons : Flag, No, Yes;
-import std.traits : isIntegral;
+import std.traits : isUnsigned;
 
 
 T reflect(ubyte w, T)(T x) @safe pure nothrow @nogc
-if (isIntegral!T)
+if (isUnsigned!T && w <= 8*T.sizeof)
 {
     // from boost::crc::reflect_unsigned
     for (T l = 1u, h = cast(T)(l << (w - 1)) ; h > l ; h >>= 1, l <<= 1 )
@@ -22,25 +22,39 @@ if (isIntegral!T)
 }
 
 unittest{
-    assert(reflect!2(1) == 0b10);
-    assert(reflect!3(1) == 0b100);
-    assert(reflect!5(0b101) == 0b10100);
-    assert(reflect!8(1 << 7) == 1);
-    assert(reflect!8(0xF0) == 0x0F);
-    assert(reflect!16(0xF0_F0) == 0x0F_0F);
-    assert(reflect!32(0xF0_F0_F0_F0) == 0x0F_0F_0F_0F);
+    assert(reflect!2(1u) == 0b10);
+    assert(reflect!3(1u) == 0b100);
+    assert(reflect!5(0b101_u) == 0b10100);
+    assert(reflect!8(1u << 7) == 1);
+    assert(reflect!8(0xF0_u) == 0x0F);
+    assert(reflect!16(0xF0_F0_u) == 0x0F_0F);
+    assert(reflect!32(0xF0_F0_F0_F0_u) == 0x0F_0F_0F_0F);
+    assert(reflect!64(1uL) == 1L << 63);
 }
 
 
 pure nothrow @nogc
 template crc(T, T Polynom, Flag!"Refin" Refin = No.Refin, Flag!"Refout" Refout = No.Refout)
-if(is(T == ubyte) || is(T == ushort) || is(T == uint))
+if(is(T == ubyte) || is(T == ushort) || is(T == uint) || is(T == ulong))
 {
-    enum CRCsize = T.sizeof * 8;
-    enum DataShift = CRCsize - 8;
-    enum bool isCRC_8 = CRCsize == 8;
-    enum T MSB = 1 << (CRCsize - 1);
-    
+    enum width = T.sizeof * 8;
+    enum T dataShift = width - 8;
+    enum bool isCRC_8 = width == 8;
+    enum T MSB = 1uL << (width - 1);
+
+    T step(ubyte data, T reg) @safe {
+        static if(Refin) data = reflect!8(data);
+
+        reg ^= (cast(T)data << dataShift);
+
+        foreach(_; 0..8){ // деление на Polynom (mod 2)
+            if (reg & MSB)
+                reg = cast(T)(reg << 1) ^ Polynom;
+            else
+                reg <<= 1;
+        }
+        return reg;
+    }
 
     version(CRC_No_Table)
     {
@@ -131,8 +145,6 @@ version(D_BetterC) extern(C) __gshared{
 import core.stdc.stdio;
 
 version(unittest){
-    immutable ubyte[9] check = cast(ubyte[9]) "123456789";
-
     struct CRC_unit {
         string name;
     }
@@ -159,9 +171,7 @@ unittest
     alias crc32 = crc!(uint, 0, Yes.Refin); // проверка reflect unittest
 }
 
-
-@CRC_unit("CRC-8") // from SHT20
-unittest
+unittest // from SHT20
 {
     alias crc8_31 = crc!(ubyte, 0x31);
 
@@ -181,46 +191,4 @@ unittest
     {
         assert(crc8_31(0, datas[i].data.ptr, 2) == datas[i].check);
     }
-}
-
-@CRC_unit("CRC-8/NRSC-5")
-unittest
-{
-    assert(crc!(ubyte, 0x31)(0xFF, check.ptr, check.length) == 0xF7); // CRC-8/NRSC-5 в каталоге
-}
-
-@CRC_unit("CRC-8/CDMA2000")
-unittest
-{
-    assert(crc!(ubyte, 0x9b)(0xFF, check.ptr, check.length) == 0xda);
-}
-
-@CRC_unit("CRC-8/DVB-S2")
-unittest
-{
-    assert(crc!(ubyte, 0xd5)(0, check.ptr, check.length) == 0xbc);
-}
-
-@CRC_unit("CRC-8/BLUETOOTH")
-unittest
-{
-    assert(crc!(ubyte, 0xa7, Yes.Refin, Yes.Refout)(0, check.ptr, check.length) == 0x26);
-}
-
-@CRC_unit("CRC-8/DARC")
-unittest
-{
-    assert(crc!(ubyte, 0x39, Yes.Refin, Yes.Refout)(0, check.ptr, check.length) == 0x15);
-}
-
-// @CRC_unit("CRC-16/GSM")
-// unittest
-// {
-//     assert((crc!(ushort, 0x1021)(0, check.ptr, check.length) ^ 0xFFFF) == 0xCE3C);
-// }
-
-@CRC_unit("CRC-16/AUG-CCITT")
-unittest
-{
-    assert(crc!(ushort, 0x1021)(0x1d0f, check.ptr, check.length) == 0xe5cc);
 }

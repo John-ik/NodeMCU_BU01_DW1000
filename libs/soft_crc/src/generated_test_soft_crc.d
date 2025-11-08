@@ -443,3 +443,52 @@ unittest
     t = t ^ 0x00000000;
     assert(t == 0xbd0be338);
 }
+@CRC_unit("CRC-64/ECMA-182")
+unittest
+{
+    auto t = crc!(ulong, 0x42f0e1eba9ea3693, cast(Flag!"Refin") false, cast(Flag!"Refout") false)(0x0000000000000000, str.ptr, str.length);
+    t = t ^ 0x0000000000000000;
+    assert(t == 0x6c40df5f0b497347);
+}
+@CRC_unit("CRC-64/GO-ISO")
+unittest
+{
+    auto t = crc!(ulong, 0x000000000000001b, cast(Flag!"Refin") true, cast(Flag!"Refout") true)(0xffffffffffffffff, str.ptr, str.length);
+    t = t ^ 0xffffffffffffffff;
+    assert(t == 0xb90956c775a41001);
+}
+@CRC_unit("CRC-64/MS")
+unittest
+{
+    auto t = crc!(ulong, 0x259c84cba6426349, cast(Flag!"Refin") true, cast(Flag!"Refout") true)(0xffffffffffffffff, str.ptr, str.length);
+    t = t ^ 0x0000000000000000;
+    assert(t == 0x75d4b74f024eceea);
+}
+@CRC_unit("CRC-64/NVME")
+unittest
+{
+    auto t = crc!(ulong, 0xad93d23594c93659, cast(Flag!"Refin") true, cast(Flag!"Refout") true)(0xffffffffffffffff, str.ptr, str.length);
+    t = t ^ 0xffffffffffffffff;
+    assert(t == 0xae8b14860a799888);
+}
+@CRC_unit("CRC-64/REDIS")
+unittest
+{
+    auto t = crc!(ulong, 0xad93d23594c935a9, cast(Flag!"Refin") true, cast(Flag!"Refout") true)(0x0000000000000000, str.ptr, str.length);
+    t = t ^ 0x0000000000000000;
+    assert(t == 0xe9c6d914c4b8d9ca);
+}
+@CRC_unit("CRC-64/WE")
+unittest
+{
+    auto t = crc!(ulong, 0x42f0e1eba9ea3693, cast(Flag!"Refin") false, cast(Flag!"Refout") false)(0xffffffffffffffff, str.ptr, str.length);
+    t = t ^ 0xffffffffffffffff;
+    assert(t == 0x62ec59e3f1a4f00a);
+}
+@CRC_unit("CRC-64/XZ")
+unittest
+{
+    auto t = crc!(ulong, 0x42f0e1eba9ea3693, cast(Flag!"Refin") true, cast(Flag!"Refout") true)(0xffffffffffffffff, str.ptr, str.length);
+    t = t ^ 0xffffffffffffffff;
+    assert(t == 0x995dc9bbdf1939fa);
+}
