@@ -1,15 +1,24 @@
 module soft_crc;
-/++
 
-Refs: каталог CRC: https://reveng.sourceforge.io/crc-catalogue/all.htm
-+/
-import std.typecons : Flag, No, Yes;
+import std.typecons : Flag, No, Yes; //? public import
 import std.traits : isUnsigned;
+import std.digest : isDigest;
 
+/++
+Побитовый разворт числа.
 
-T reflect(ubyte w, T)(T x) @safe pure nothrow @nogc
+Params:
+    w = число бит в числе, именно внутри них разворачивается.
+    Если нечетный, то середина остается на месте
+    T = беззнаковое целое
+    a = число которое надо перевернуть
+
+Return: развернутый a
++/
+T reflect(ubyte w, T)(const T a) @safe pure nothrow @nogc
 if (isUnsigned!T && w <= 8*T.sizeof)
 {
+    T x = a;
     // from boost::crc::reflect_unsigned
     for (T l = 1u, h = cast(T)(l << (w - 1)) ; h > l ; h >>= 1, l <<= 1 )
     {
@@ -20,8 +29,9 @@ if (isUnsigned!T && w <= 8*T.sizeof)
     }
     return x;
 }
-
-unittest{
+///
+@safe pure nothrow @nogc
+unittest {
     assert(reflect!2(1u) == 0b10);
     assert(reflect!3(1u) == 0b100);
     assert(reflect!5(0b101_u) == 0b10100);
@@ -32,100 +42,114 @@ unittest{
     assert(reflect!64(1uL) == 1L << 63);
 }
 
+/++
+Универсальный параметрическйи CRC реализующий Template API `std.digest`.
 
-pure nothrow @nogc
-template crc(T, T Polynom, Flag!"Refin" Refin = No.Refin, Flag!"Refout" Refout = No.Refout)
+Задается по модели Rocksoft™.
+Таблица задана как `static`, т.е. для одинаковых интансов шаблона будет одна.
+Она генерируется в CTFE.
+
+Params:
+    T = беззнаковое целое в котором поместиться CRC
+    Polynom = в нормальной (прямой нотации): x^8 + x^5 + x^4 + 0 = 0x31
+    init = значение с которого начинается
+    refin = отражать ли входные байты, обратный порядок битов
+    refout = отражение бит в результате
+    xorout = выполнить XOR перед выдачей результата (после refout, если задан)
+
+Bugs: Не реализован параметр *residue*. Зачем он я не понял
+
+See_Also:
+- $(LINK http://en.wikipedia.org/wiki/Cyclic_redundancy_check)
+- Ross N. Williams/Anarchriz. Всё о CRC32 $(LINK https://web.archive.org/web/20130407000813/http://rsdn.ru/article/files/classes/SelfCheck/crcguide.pdf)
+- Каталог CRC $(LINK https://reveng.sourceforge.io/crc-catalogue/all.htm)
++/
+struct CRC(T, T Polynom, T init = 0,
+    Flag!"refin" refin = No.refin, Flag!"refout" refout = No.refout,
+    T xorout = 0)
 if(is(T == ubyte) || is(T == ushort) || is(T == uint) || is(T == ulong))
 {
-    enum width = T.sizeof * 8;
-    enum T dataShift = width - 8;
-    enum bool isCRC_8 = width == 8;
-    enum T MSB = 1uL << (width - 1);
+    enum width = T.sizeof * 8; /// ширина CRC в битах
+    private enum T dataShift = width - 8; /// сдвиг даты на входе
+    private enum bool isCRC_8 = width == 8;
+    private enum T MSB = 1uL << (width - 1); /// старшый бит
 
-    T step(ubyte data, T reg) @safe {
-        static if(Refin) data = reflect!8(data);
+    T reg = init;
 
-        reg ^= (cast(T)data << dataShift);
-
-        foreach(_; 0..8){ // деление на Polynom (mod 2)
-            if (reg & MSB)
-                reg = cast(T)(reg << 1) ^ Polynom;
-            else
-                reg <<= 1;
-        }
-        return reg;
+    /// сбрасывает состояние. Релизует `isDigest`
+    void start() @safe pure nothrow @nogc {
+        reg = init;
     }
 
-    version(CRC_No_Table)
-    {
-        T crc(T init, scope const (ubyte)* p_data, size_t size)
-        {
-            T reg = init;
-            while(size--){
-                ubyte d = *(p_data++);
+    /// ввод data на вход CRC. Релизует `isDigest`
+    void put(scope const(ubyte)[] data...) @safe pure nothrow @nogc {
+        for(size_t i = 0; i < data.length; i++){
+            T d = data[i];
+            static if(refin) d = reflect!8(d);
 
-                static if(Refin) d = reflect!8(d);
+            reg ^= (cast(T)d << dataShift);
 
-                reg ^= (d << DataShift);
-
-                foreach(_; 0..8){ // деление на Polynom (mod 2)
-                    if (reg & MSB)
-                        reg = cast(T)(reg << 1) ^ Polynom;
-                    else
-                        reg <<= 1;
-                }
-            }
-            static if (Refout)
-                return reflect!(CRCsize)(reg);
-            else
-                return reg;
-        }
-    }
-    else
-    {
-        immutable T[256] table = {
-            import std.traits : Signed;
-            // функция что существует только в компл-тайме
-            // в objdump она не отображается
-            // с таблицей даже размер text в бинарнике меньше
-            T[256] t = void;
-            foreach (ubyte x; 0..256) {
-                static if (Refin)
-                    T crc = reflect!8(x) << (CRCsize - 8);
+            foreach(_; 0..8){ // деление на Polynom (mod 2)
+                if (reg & MSB)
+                    reg = cast(T)(reg << 1) ^ Polynom;
                 else
-                    T crc = x << (CRCsize - 8); // свдиг на 0 же оптимизурется, верно?
-                foreach (_; 0..8) {
-                    crc = cast(ubyte)(crc & MSB ? (crc << 1) ^ Polynom : crc << 1);
-                }
-                static if (Refin)
-                    t[x] = reflect!CRCsize(crc);
-                else
-                    t[x] = crc;
+                    reg <<= 1;
             }
-            return t;
-        }();
-
-        T crc(T crc, scope const(ubyte)* p_data, size_t size)
-        {
-            static if(Refin)
-                crc = reflect!CRCsize(crc);
-
-            while(size--){
-                static if(isCRC_8)
-                    crc = table[crc ^ *(p_data++)];
-                else{
-                    static if(Refin)
-                        crc = (crc >> 8) ^ table[cast(ubyte)(crc & 0xFF) ^ *(p_data++)];
-                    else
-                        crc = cast(T)(crc << 8) ^ table[cast(ubyte)((crc >> (CRCsize - 8)) & 0xFF ) ^ *(p_data++)];
-                }
-            }
-            static if (Refout)
-                return reflect!CRCsize(crc);
-            else
-                return crc;
         }
     }
+
+    /// получить как число. (после refout и xorout, если заданы)
+    T get() const @safe pure nothrow @nogc {
+        static if(refout)
+            return reflect!(width)(reg) ^ xorout;
+        else
+            return reg ^ xorout;
+    }
+
+    /// получить байты и сбросить. Релизует `isDigest`
+    ubyte[T.sizeof] finish() @safe pure nothrow @nogc {
+        scope(exit) this.start();
+        return this.peek();
+    }
+
+    /// получить байты (без сброса). Релизует `isDigest`
+    ubyte[T.sizeof] peek() const @safe pure nothrow @nogc {
+        import std.bitmanip : nativeToLittleEndian;
+        return nativeToLittleEndian(this.get());
+    }
+
+    
+    // version(None)
+    // {
+    //     static immutable T[256] table = {
+    //         // функция что существует только в компл-тайме
+    //         // в objdump она не отображается
+    //         // с таблицей даже размер text в бинарнике меньше
+    //         T[256] t = void;
+    //         foreach (ubyte i; 0..256) {
+    //             T a = step(i, 0);
+    //             static if (refin) a = reflect!width(a);
+    //             t[i] = a;
+    //         }
+    //         return t;
+    //     }();
+
+    //     T crc(T init, scope const(ubyte)* p_data, size_t size)
+    //     {
+    //         T reg = init;
+    //         while(size--){
+    //             static if (isCRC_8){
+    //                 reg = table[reg ^ *(p_data++)];
+    //             }else{
+    //                 static if(refin)
+    //                     reg = (reg >> 8) ^ table[cast(ubyte)(reg & 0xFF) ^ *(p_data++)];
+    //                 else
+    //                     reg = cast(T)(reg << 8) ^ table[cast(ubyte)((reg >> (width - 8)) & 0xFF ) ^ *(p_data++)];
+    //             }
+    //         }
+    //         return reg;
+    //     }
+    // }
 }
 
 version(D_BetterC) extern(C) __gshared{
@@ -142,7 +166,6 @@ version(D_BetterC) extern(C) __gshared{
 // можно исп и текущею, но тут лишний цикл, можно оптимизировать
 }
 
-import core.stdc.stdio;
 
 version(unittest){
     struct CRC_unit {
@@ -153,6 +176,7 @@ version(unittest){
     extern(C)
     void main (){
         import std.traits : hasUDA, getUDAs, select;
+        import core.stdc.stdio;
 
         static foreach(u; __traits(getUnitTests, __traits(parent, main))){
             static if(hasUDA!(u, CRC_unit)){
@@ -166,29 +190,78 @@ version(unittest){
 
 unittest
 {
-    alias crc8 = crc!(ubyte, 0, Yes.Refin); // проверка reflect unittest
-    alias crc16 = crc!(ushort, 0, Yes.Refin); // проверка reflect unittest
-    alias crc32 = crc!(uint, 0, Yes.Refin); // проверка reflect unittest
+    alias crc8 = CRC!(ubyte, 0, 0, Yes.refin);
+    alias crc16 = CRC!(ushort, 0, 0, Yes.refin);
+    alias crc32 = CRC!(uint, 0, 0, Yes.refin);
+    alias crc64 = CRC!(ulong, 0, 0, Yes.refin);
+
+    static assert(isDigest!crc8);
+    static assert(isDigest!crc16);
+    static assert(isDigest!crc32);
+    static assert(isDigest!crc64);
+
+    static assert(__traits(isPOD, crc8));
+    static assert(__traits(isPOD, crc16));
+    static assert(__traits(isPOD, crc32));
+    static assert(__traits(isPOD, crc64));
 }
 
 unittest // from SHT20
 {
-    alias crc8_31 = crc!(ubyte, 0x31);
+    CRC!(ubyte, 0x31u, 0) crc;
+    
+    static assert(isDigest!(typeof(crc)));
 
-    struct Test (T, size_t size){
-        T[size] data;
-        T check;
-    }
-
-    Test!(ubyte, 2)[4] datas = [
-        Test!(ubyte, 2)([0x6E, 0xA8], 0x7D),
-        Test!(ubyte, 2)([0x6A, 0x86], 0x67),
-        Test!(ubyte, 2)([0x6E, 0xA0], 0xC4),
-        Test!(ubyte, 2)([0x6B, 0xC2], 0x6A)
+    ubyte[3][4] datas = [// CRC
+        [0x6E, 0xA8,       0x7D],
+        [0x6A, 0x86,       0x67],
+        [0x6E, 0xA0,       0xC4],
+        [0x6B, 0xC2,       0x6A]
     ];
 
     for(size_t i = 0; i < datas.length; i++)
     {
-        assert(crc8_31(0, datas[i].data.ptr, 2) == datas[i].check);
+        crc.put(datas[i]);
+        assert(crc.finish == [0]);
     }
+}
+
+
+version(D_BetterC){}else
+unittest
+{
+    // POSIX zlib CRC32. Poly = 0x04C11DB7, init = uint.max, Reflect, xorout = uint.max
+    // Ref: TODO:
+    import std.zlib : crc32;
+
+    CRC!(uint, 0x04C11DB7, uint.max, Yes.refin, Yes.refout, uint.max) my_crc;
+    
+    static assert(isDigest!(typeof(my_crc)));
+
+    immutable ubyte[8] data = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    my_crc.put(data);
+
+    assert(my_crc.get() == crc32(0, data));
+}
+
+version(D_BetterC){}else
+unittest
+{
+    import std.digest.crc : CRC32;
+    CRC32 std_crc;
+    CRC!(uint, 0x04C11DB7, uint.max, Yes.refin, Yes.refout, uint.max) my_crc;
+
+    static assert(isDigest!(typeof(my_crc)));
+
+    immutable ubyte[6] data = [1, 2, 3, 4, 5, 6];
+
+    std_crc.put(data);
+    my_crc.put(data);
+
+    assert(std_crc.peek() == my_crc.peek());
+    assert(std_crc.finish() == my_crc.finish());
+    assert(my_crc.reg == uint.max);
+    assert(std_crc.peek() == my_crc.peek());
+    assert(my_crc.reg == uint.max);
 }
