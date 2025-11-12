@@ -6,18 +6,21 @@
 
 #include "deca_regs.h"
 
+typedef int32_t fixed_5_32_t;
+
 typedef enum {
     MSG_PULL       = 0x11, ///< протокол 2-смс
     MSG_RESP       = 0x12, ///< протокол 2-смс
     MSG_PULL_3     = 0x21, ///< протокол 3-смс
     MSG_RESP_3     = 0x22, ///< протокол 3-смс
-    MSG_FINAL      = 0x13, ///< протокол 3-смс
-    MSG_DISTANCE   = 0x44
+    MSG_FINAL      = 0x23, ///< протокол 3-смс
+    MSG_DIST   = 0x44
 } MSG_Types;
 
 #define MSG_PLACEHOLDER_8  0
 #define MSG_PLACEHOLDER_16 0,0
 #define MSG_PLACEHOLDER_32 0,0,0,0
+#define MSG_PLACEHOLDER_DIST MSG_PLACEHOLDER_32
 #define MSG_PLACEHOLDER_TS MSG_PLACEHOLDER_32,MSG_PLACEHOLDER_8 ///< 40 bit
 #define MSG_PLACEHOLDER_64 0,0,0,0,0,0,0,0
 
@@ -37,13 +40,15 @@ typedef enum {
 #define MSG_CRC_len 2
 
 #define MSG_PULL_len (MSG_HEADER_normal_len + MSG_TYPE_len + MSG_CRC_len)
-extern uint8_t msg_pull[];
+extern uint8_t msg_pull[];  /// только тип как полезная нагрузка
 #define MSG_RESP_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
-extern uint8_t msg_resp[];
-#define MSG_FINAL_len (MSG_HEADER_normal_len + MSG_TYPE_len + 2*5 + MSG_CRC_len)
-extern uint8_t msg_final[];
+extern uint8_t msg_resp[];  ///< pull_rx_ts, resp_tx_ts
+#define MSG_FINAL_len (MSG_HEADER_normal_len + MSG_TYPE_len + 3*5 + MSG_CRC_len)
+extern uint8_t msg_final[]; ///< resp_rx_ts, final_tx_ts, pull_tx_ts
+#define MSG_DIST_len (MSG_HEADER_normal_len + MSG_TYPE_len  + 4 + MSG_CRC_len)
+extern uint8_t msg_dist[]; ///< 5 byte time interval
 
-#define MSG_MAX_LEN MSG_RESP_len
+#define MSG_MAX_LEN MSG_FINAL_len
 
 
 #define MSG_SEQNUM(msg)  (msg[2])
@@ -52,10 +57,21 @@ extern uint8_t msg_final[];
 #define MSG_SRC_ID(msg)  (*((uint16_t*) &msg[7])) //! тут вообще-то должен получаться невыровненый доступ
 #define MSG_TYPE(msg)    (msg[9])
 
-#define MSG_RESP_ONE_pull_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
-#define MSG_RESP_ONE_pull_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
-#define MSG_RESP_ONE_resp_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)
-#define MSG_RESP_ONE_resp_tx_ts_set(msg, src_p) memcpy(&msg[15], src_p, 5)
+#define MSG_RESP_pull_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
+#define MSG_RESP_pull_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
+#define MSG_RESP_resp_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)
+#define MSG_RESP_resp_tx_ts_set(msg, src_p) memcpy(&msg[15], src_p, 5)
+
+#define MSG_FINAL_resp_rx_ts_get(msg, dest_p) memcpy(dest_p, &msg[10], 5)
+#define MSG_FINAL_resp_rx_ts_set(msg, src_p) memcpy(&msg[10], src_p, 5)
+#define MSG_FINAL_final_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[15], 5)
+#define MSG_FINAL_final_tx_ts_set(msg, src_p) memcpy(&msg[15], src_p, 5)
+#define MSG_FINAL_pull_tx_ts_get(msg, dest_p) memcpy(dest_p, &msg[20], 5)
+#define MSG_FINAL_pull_tx_ts_set(msg, src_p) memcpy(&msg[20], src_p, 5)
+
+#define MSG_DIST_dist_get(msg, dest_p) memcpy(dest_p, &msg[10], 4)
+#define MSG_DIST_dist_set(msg, src_p) memcpy(&msg[10], src_p, 4)
+
 
 /*
 !           Про невыровненый доступ
@@ -89,12 +105,12 @@ typedef enum{
     EVENT_msg_PULL_3   = EVENTs_msg | MSG_PULL_3,
     EVENT_msg_RESP_3   = EVENTs_msg | MSG_RESP_3,
     EVENT_msg_FINAL    = EVENTs_msg | MSG_FINAL,
-    EVENT_msg_DISTANCE = EVENTs_msg | MSG_DISTANCE,
+    EVENT_msg_DIST     = EVENTs_msg | MSG_DIST,
 
     // ------------------------- CUSTOM -------------------------
 
-    EVENT_initiate_ss_twr = EVENTs_custom | 0x1,
-    EVENT_initiate_ds_twr = EVENTs_custom | 0x2,
+    EVENT_initiate_pull     = EVENTs_custom | MSG_PULL,
+    EVENT_initiate_pull_3   = EVENTs_custom | MSG_PULL_3,
     EVENT_initiate_sniffer  = EVENTs_custom | 0xf0,
     
     // ------------------------- HOST -------------------------

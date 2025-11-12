@@ -5,7 +5,9 @@
 
 uint8_t msg_pull[MSG_PULL_len]   = {MSG_BEGIN, MSG_PULL, MSG_END};
 uint8_t msg_resp[MSG_RESP_len]   = {MSG_BEGIN, MSG_RESP, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
-uint8_t msg_final[MSG_FINAL_len] = {MSG_BEGIN, MSG_FINAL, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
+uint8_t msg_final[MSG_FINAL_len] = {MSG_BEGIN, MSG_FINAL, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_PLACEHOLDER_TS, MSG_END};
+uint8_t msg_dist[MSG_DIST_len]   = {MSG_BEGIN, MSG_DIST, MSG_PLACEHOLDER_DIST, MSG_END};
+//TODO: вместо tof, сразу передавать fixed-point с коэф 2^5
 
 #undef MSG_BEGIN
 #undef MSG_END
@@ -15,9 +17,13 @@ uint8_t msgGetLen(MSG_Types msg_type){
 #define X(x) case x: return x##_len
         case MSG_PULL_3:
         X(MSG_PULL);
+
         case MSG_RESP_3:
         X(MSG_RESP);
+
         X(MSG_FINAL);
+
+        X(MSG_DIST);
 #undef X
         default:
             return 0;
@@ -46,9 +52,9 @@ char* showEvent(MyEvents event){
         case EVENT_msg_PULL_3:     return "EVENT_msg_pull_3";
         case EVENT_msg_RESP_3: return "EVENT_msg_resp_3";
         case EVENT_msg_FINAL:    return "EVENT_msg_final";
-        case EVENT_msg_DISTANCE: return "EVENT_msg_distance";
+        case EVENT_msg_DIST: return "EVENT_msg_distance";
         
-        case EVENT_initiate_ss_twr: return "EVENT_initiate_ss_twr";
+        case EVENT_initiate_pull: return "EVENT_initiate_pull";
         
         case EVENT_rxtimeout:         return "EVENT_rxtimeout";
         
@@ -67,7 +73,7 @@ char* showMsgType(MSG_Types type){
         case MSG_PULL_3:     return "MSG_pull_3";
         case MSG_RESP_3: return "MSG_resp_3";
         case MSG_FINAL:    return "MSG_final";
-        case MSG_DISTANCE: return "MSG_distance";
+        case MSG_DIST: return "MSG_distance";
     }
     return "! undefined msg type !";
 }
@@ -89,30 +95,62 @@ void showMsg(char* str, size_t str_size, uint8_t msg[]){
     str += printed;
     str_size -= printed;
 
-    static uint64_t pull_rx_ts, resp_tx_ts;
+    static uint64_t rx_ts, tx_ts;
+    static float dist;
 
     switch(msg_type){
         case MSG_PULL:
+        case MSG_PULL_3:
             break;
         case MSG_RESP:
-            MSG_RESP_ONE_pull_rx_ts_get(msg, &pull_rx_ts);
-            MSG_RESP_ONE_resp_tx_ts_get(msg, &resp_tx_ts);
+        case MSG_RESP_3:
+            MSG_RESP_pull_rx_ts_get(msg, &rx_ts);
+            MSG_RESP_resp_tx_ts_get(msg, &tx_ts);
     #if __IMPORTC__
             printed = snprintf(str, str_size,
                                 "\tpull_rx_ts = 0x%010llX\n"
                                 "\tresp_tx_ts = 0x%010llX\n",
-                                pull_rx_ts,
-                                resp_tx_ts
+                                rx_ts,
+                                tx_ts
             );
     #else
             printed = snprintf(str, str_size,
                                 "\tpull_rx_ts = 0x%02X%08lX\n"
                                 "\tresp_tx_ts = 0x%02X%08lX\n",
-                                (uint8_t)(pull_rx_ts >> 32), (uint32_t) pull_rx_ts,
-                                (uint8_t)(resp_tx_ts >> 32), (uint32_t) resp_tx_ts
+                                (uint8_t)(rx_ts >> 32), (uint32_t) rx_ts,
+                                (uint8_t)(tx_ts >> 32), (uint32_t) tx_ts
             );
     #endif
             goto printed;
+        
+        case MSG_FINAL:
+            MSG_RESP_pull_rx_ts_get(msg, &rx_ts);
+            MSG_RESP_resp_tx_ts_get(msg, &tx_ts);
+    #if __IMPORTC__
+            printed = snprintf(str, str_size,
+                                "\tresp_rx_ts = 0x%010llX\n"
+                                "\tfinal_tx_ts = 0x%010llX\n",
+                                rx_ts,
+                                tx_ts
+            );
+    #else
+            printed = snprintf(str, str_size,
+                                "\tresp_rx_ts = 0x%02X%08lX\n"
+                                "\tfinal_tx_ts = 0x%02X%08lX\n",
+                                (uint8_t)(rx_ts >> 32), (uint32_t) rx_ts,
+                                (uint8_t)(tx_ts >> 32), (uint32_t) tx_ts
+            );
+    #endif
+            goto printed;
+        
+        case MSG_DIST:
+            MSG_DIST_dist_get(msg, &dist);
+            printed = snprintf(str, str_size,
+                                "\tdist = %.2f\n",
+                                dist
+            );
+            goto printed;
+
         default:
             return;
 

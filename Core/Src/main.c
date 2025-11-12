@@ -79,9 +79,15 @@ static uint8 frame_seq_nb = 0;
 static uint8 frame_beacon_seq_nm = 0;
 static uint8 frame_seq_nb_semaphore = 0;
 
-/* Buffer to store received messages.
- * Its size is adjusted to longest frame that this example code is supposed to handle. */
-static uint8 rx_buffer[MSG_MAX_LEN];
+/// @brief буфер для смс. Самое длинное по стандарту MAC
+static uint8_t rx_buffer_raw[127+5];
+static uint8_t *rx_buffer = &rx_buffer_raw[5]; // магия с перекрыванием памяти
+/// @brief размер принятого смс
+static uint16_t rx_len;
+
+static const dwt_cb_data_t *cb_data_p;
+
+static uint64_t *rx_ts_sniffer = (uint64_t*) &rx_buffer_raw[0]; // магия с пересечением памяти
 
 /* USER CODE END PV */
 
@@ -130,10 +136,9 @@ void trace_msg(uint8 msg[]){
  @return `DWT_SUCCESS` for success, or `DWT_ERROR` for error (e.g. a delayed transmission will fail if the delayed time has passed)
  */
 int sendtx(uint8 msg[], uint8 msg_len, uint8 tx_mode, const int ranging){
-  led_signal(MSG_SEQNUM(msg) & 7);
-
-  // showMsg(uart_buf, UART_BUF_len, msg);
-  // DEBUG_transmit_str(uart_buf);
+#ifdef TAG
+  led_signal(MSG_TYPE(msg) & 7);
+#endif
 
   dwt_writetxdata(msg_len, msg, 0);
   dwt_writetxfctrl(msg_len, 0, ranging);
@@ -141,77 +146,53 @@ int sendtx(uint8 msg[], uint8 msg_len, uint8 tx_mode, const int ranging){
   return dwt_starttx(tx_mode);
 }
 
-/**
- * @brief получает сообщений и кладет в `rx_buffer`
- */
-uint16 recieverx(){
-  // Transmit("receiverx\n");
-  uint16 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-  if (frame_len <= MSG_MAX_LEN){
-    dwt_readrxdata(rx_buffer, frame_len, 0);
-    led_signal(MSG_SEQNUM(rx_buffer) & 7);
-    // showMsg(uart_buf, UART_BUF_len, rx_buffer);
-    // DEBUG_transmit_str(uart_buf);
-  }
-  return frame_len;
+/// @brief Use before Transmit and config TX/RX
+void toIdle(){
+  dwt_forcetrxoff();
+}
+
+/// @brief Use after RX error or other UB
+void toIdleFromErr(){
+  dwt_forcetrxoff();
+  dwt_rxreset();
 }
 
 // ============================== HANDLERS ==============================
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
   if (GPIO_Pin == IRQ_Pin){
-    dwt_irq();
+    /* 
+      main call-back for processing of DW1000 IRQ
+      it re-enters the IRQ routing and processes all events.
+      After processing of all events, DW1000 will clear the IRQ line.
+    */
+    while(HAL_GPIO_ReadPin(IRQ_GPIO_Port, IRQ_Pin) != 0){
+        dwt_isr();
+    } //while DW1000 IRQ line active
   }
 }
 
 static uint8 flag_send = 0;
-void handler_send(uint32 status){
-  UNUSED(status);
+void handler_send(const dwt_cb_data_t * data){
+  cb_data_p = data;
   flag_send = 1;
-  // Transmit("send\n");
-}
-
-static uint8 pll_err_counter = 0;
-static uint32 flag_pll_err = 0; // and save which pll issue
-void handler_pll_error(uint32 status){
-  pll_err_counter++;
-  flag_pll_err = status & DWT_IRQ_PLL_ERROR;
 }
 
 static uint8 flag_rxok = 0;
-void handler_rxok(uint32 status){
-  UNUSED(status);
-  recieverx();
+void handler_rxok(const dwt_cb_data_t * data){
+  cb_data_p = data;
   flag_rxok = 1;
 }
 
-static uint32 flag_rxfailed_status = 0;
-void handler_rxfailed(uint32 status){
-  flag_rxfailed_status = status & DWT_IRQ_RXFAILED;
+void handler_rxfailed(const dwt_cb_data_t * data){
+  UNUSED(data);
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
 static uint8 flag_rxtimeout = 0;
-void handler_rxtimeout(uint32 status){
-  UNUSED(status);
+void handler_rxtimeout(const dwt_cb_data_t * data){
+  UNUSED(data);
   flag_rxtimeout = 1;
-}
-
-/// assign dwt_handlers
-void init_irq(){
-  _dwt_handler_send = &handler_send;
-  _dwt_handler_pll_error = &handler_pll_error;
-  _dwt_handler_rxok = &handler_rxok;
-  _dwt_handler_rxfailed = &handler_rxfailed;
-  _dwt_handler_rxtimeout = &handler_rxtimeout;
-
-  dwt_setinterrupt(
-    DWT_IRQ_SEND |
-    DWT_IRQ_PLL_ERROR |
-    DWT_IRQ_RXOK |
-    DWT_IRQ_RXFAILED |
-    DWT_IRQ_RXTIMEOUT
-    , 1
-  );
 }
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ HANDLERS ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -219,21 +200,27 @@ void init_irq(){
 
 typedef enum {
   STATE_none     = 0,
-  STATE_Receive  = 1,
-  STATE_SS_TWR = 2,
+  STATE_Receive,
+  STATE_wait_RESP,
+  STATE_wait_RESP_3,
+  STATE_wait_FINAL,
+  STATE_wait_DIST,
 
   STATE_Sniffer  = 0xf0
 } State;
 static State state = STATE_none;
 
-static uint16 frame_filter = DWT_FF_DATA_EN;
+static uint16 frame_filter = 0; // DWT_FF_DATA_EN;
 
 char* showState(State state){
   switch (state)
   {
-  case STATE_none:     return "STATE_none";
-  case STATE_Receive:  return "STATE_Receive";
-  case STATE_SS_TWR: return "STATE_SS_TWR";
+  case STATE_none:          return "STATE_none";
+  case STATE_Receive:       return "STATE_Receive";
+  case STATE_wait_RESP:     return "STATE_wait_RESP";
+  case STATE_wait_RESP_3:   return "STATE_wait_RESP_3";
+  case STATE_wait_FINAL:    return "STATE_wait_FINAL";
+  case STATE_wait_DIST:     return "STATE_wait_DIST";
   default:
     return "! UNDEFINED STATE !";
   }
@@ -242,63 +229,34 @@ char* showState(State state){
 #define STATUS_TIMEOUT(st) st & SYS_STATUS_RXRFTO
 #define STATUS_OK(st)      st & SYS_STATUS_RXFCG
 
-/// @brief turn on RX
-void toReceive(){
-  dwt_setrxtimeout(0);
-  dwt_rxenable(0);
-}
+static int64_t  pull_tx_ts,  pull_rx_ts,
+                resp_tx_ts,  resp_rx_ts,
+                final_tx_ts, final_rx_ts;
 
-/*!
- * @brief set RX timeout and turn on 
- * input parameters
- * @param time - how long the receiver remains on from the RX enable command
- *               The time parameter used here is in 1.0256 us (512/499.2MHz) units
- *               If set to 0 the timeout is disabled.
- */
-void toReceiveInTime(uint16 time){
-  dwt_setrxtimeout(time);
-  dwt_rxenable(0);
-}
-
-/// @brief Use before Transmit and config transmit
-void toIdle(){
-  dwt_forcetrxoff();
-}
+static float dist;
+static uint16_t src_addres = 0xFFFF;
 
 void step(MsgEvent event){
-  int64_t pull_rx_ts = 0, resp_tx_ts = 0;
-  int64_t req_tx_ts = 0, ans_rx_ts = 0, ans_tx_ts = 0, req_rx_ts = 0;
-
   switch(state){
     case STATE_Receive:
       switch(event){
-        case EVENT_initiate_ss_twr: // in STATE_Receive
+        case EVENT_initiate_pull: // in STATE_Receive
+        case EVENT_initiate_pull_3:
+
           toIdle();
           dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
           dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
-          MSG_SEQNUM(msg_pull) = frame_seq_nb++;
-          MSG_PAN_ID(msg_pull) = MY_PAN_ID;
+          MSG_SEQNUM(msg_pull)  = ++frame_seq_nb;
+          MSG_PAN_ID(msg_pull)  = MY_PAN_ID;
           MSG_DEST_ID(msg_pull) = 0xFFFF;
           MSG_SRC_ID(msg_pull)  = my_addr;
-          
-          state = STATE_SS_TWR; // mutate state
+          MSG_TYPE(msg_pull)    = (uint8_t) event; // либо PULL либо PULL_3
 
-          sendtx(msg_pull, MSG_PULL_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
-          TRACE_MSG(msg_pull);
-          return;
-
-        case EVENT_initiate_ds_twr:
-          toIdle();
-          dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-          dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
-
-          MSG_SEQNUM(msg_pull) = frame_seq_nb++;
-          MSG_PAN_ID(msg_pull) = MY_PAN_ID;
-          MSG_DEST_ID(msg_pull) = 0xFFFF;
-          MSG_SRC_ID(msg_pull)  = my_addr;
-          
-          state = STATE_SS_TWR; // mutate state
+          if (event == EVENT_initiate_pull)
+            state = STATE_wait_RESP; // mutate state
+          else
+            state = STATE_wait_RESP_3; // mutatue state
 
           sendtx(msg_pull, MSG_PULL_len, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED, RANGING_ON);
           TRACE_MSG(msg_pull);
@@ -306,91 +264,205 @@ void step(MsgEvent event){
 
         case EVENT_initiate_sniffer: // in STATE_Receive
           toIdle();
+          state = STATE_Sniffer;
           dwt_setrxtimeout(0);
           dwt_setsniffmode(1, SNIFF_ON_TIME, SNIFF_OFF_TIME); // настройка режима сниффера
           dwt_enableframefilter(DWT_FF_NOTYPE_EN); // вырубаем фильтрацию, т.к. слушаем всё
-          state = STATE_Sniffer;
+          dwt_setdblrxbuffmode(1); // вкл двойной буфер
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
 
-        case EVENT_msg_PULL: // in STATE_Receive
+        case EVENT_msg_PULL_3: // якорь поймал
+        case EVENT_msg_PULL: // якорь моймал
           toIdle();
+
+          src_addres = MSG_SRC_ID(rx_buffer);
 
           pull_rx_ts = get_rx_ts();
           resp_tx_ts = (pull_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME));
           dwt_setdelayedtrxtime((uint32) (resp_tx_ts >> 8) );
           //? set rx timreout and rxaftertxdelay
 
-          resp_tx_ts = (((uint64_t)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
+          resp_tx_ts = (((int64_t)(resp_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
           MSG_SEQNUM(msg_resp)  = MSG_SEQNUM(rx_buffer);
           MSG_PAN_ID(msg_resp)  = MY_PAN_ID;
-          MSG_DEST_ID(msg_resp) = MSG_SRC_ID(rx_buffer);
+          MSG_DEST_ID(msg_resp) = src_addres;
           MSG_SRC_ID(msg_resp)  = my_addr;
-          MSG_RESP_ONE_pull_rx_ts_set(msg_resp, &pull_rx_ts);
-          // resp_tx_ts += TX_ANT_DLY;
-          MSG_RESP_ONE_resp_tx_ts_set(msg_resp, &resp_tx_ts);
+          MSG_RESP_pull_rx_ts_set(msg_resp, &pull_rx_ts);
+          MSG_RESP_resp_tx_ts_set(msg_resp, &resp_tx_ts);
 
-          int err = sendtx(msg_resp, MSG_RESP_len, DWT_START_TX_DELAYED, RANGING_ON);
+          if (event == EVENT_msg_PULL_3){
+            MSG_TYPE(msg_resp) = MSG_RESP_3;
+            dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+            dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+            state = STATE_wait_FINAL; // state mutate
+          }else{
+            MSG_TYPE(msg_resp) = MSG_RESP;
+            dwt_setrxtimeout(0);
+            dwt_setrxaftertxdelay(0);
+          }
+          int err = sendtx(msg_resp, MSG_RESP_len, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
           if (err){
-            toReceive();
+            dwt_setrxtimeout(0);
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
+            state = STATE_Receive; // state mutate
             return;
           }
-          
+          TRACE_MSG(rx_buffer);
           TRACE_MSG(msg_resp);
-          toReceive();
           return;
 
         default: // in STATE_Receive
           trace_msg(rx_buffer);
-          toReceive();
-          return;
-      }
-      return; // after switch(event) <-- STATE_Receive
-
-    case STATE_SS_TWR:
-      switch(event){
-        case EVENT_msg_RESP: // in STATE_SS_TWR
-          req_tx_ts = get_tx_ts();
-          ans_rx_ts = get_rx_ts();
-          MSG_RESP_ONE_resp_tx_ts_get(rx_buffer, &ans_tx_ts);
-          MSG_RESP_ONE_pull_rx_ts_get(rx_buffer, &req_rx_ts);
-
-          float time = (float) ((ans_rx_ts - req_tx_ts) - (ans_tx_ts - req_rx_ts)) / 2;
-          float dist = time * SPEED_OF_LIGHT / (128 * 499.2 * 1000000);
-          DEBUG_transmit_fmt("frame_seq_nb = %u\nreq_tx = %f, req_rx = %f, ans_tx = %f, ans_rx = %f, dist: %f m",
-                  frame_seq_nb - 1,    
-                  (float) req_tx_ts, (float) req_rx_ts, (float) ans_tx_ts, (float) ans_rx_ts, dist);
-
-          TRACE_MSG(rx_buffer);
-
-          state = STATE_Receive; // state mutate
           dwt_setrxtimeout(0);
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
           return;
+      }
+      break;
 
-        default: // in STATE_SS_TWR
-          DEBUG_transmit_str("pull_one: default");
-          state = STATE_Receive; // state mutate
-          dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    case STATE_wait_RESP:
+      if (event == EVENT_msg_RESP){
+        pull_tx_ts = get_tx_ts();
+        resp_rx_ts = get_rx_ts();
+        MSG_RESP_resp_tx_ts_get(rx_buffer, &resp_tx_ts);
+        MSG_RESP_pull_rx_ts_get(rx_buffer, &pull_rx_ts);
+  
+        float tof = ((resp_rx_ts - pull_tx_ts) - (resp_tx_ts - pull_rx_ts)) / 2;
+        float dist = uwb2meters(tof);
+        TRACE_MSG(rx_buffer);
+        
+        DEBUG_transmit_fmt("dist: %f m", dist);
+  
+        state = STATE_Receive; // state mutate
+        dwt_setrxtimeout(0);
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        return;
+      }
+      break;
+
+    case STATE_wait_RESP_3: 
+      if (event == EVENT_msg_RESP_3){ // тэг получил RESPONCE для 3-смс
+          toIdle();
+
+          pull_tx_ts = get_tx_ts();
+          resp_rx_ts = get_rx_ts();
+          MSG_RESP_pull_rx_ts_get(rx_buffer, &pull_rx_ts);
+          MSG_RESP_resp_tx_ts_get(rx_buffer, &resp_tx_ts);
+          src_addres = MSG_SRC_ID(rx_buffer);
+
+          final_tx_ts = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME));
+          dwt_setdelayedtrxtime((uint32) (final_tx_ts >> 8) );
+
+          // только там где мы сами вычисляем TX_TS надо + TX_ANT_DELAY
+          final_tx_ts = (((int64_t)(final_tx_ts & 0xFFFFFFFE00))) + TX_ANT_DLY;
+          MSG_SEQNUM(msg_final)  = frame_seq_nb;
+          MSG_PAN_ID(msg_final)  = MY_PAN_ID;
+          MSG_DEST_ID(msg_final) = src_addres;
+          MSG_SRC_ID(msg_final)  = my_addr;
+          MSG_TYPE(msg_final)    = MSG_FINAL;
+          MSG_FINAL_resp_rx_ts_set(msg_final, &resp_rx_ts);
+          MSG_FINAL_final_tx_ts_set(msg_final, &final_tx_ts);
+          MSG_FINAL_pull_tx_ts_set(msg_final, &pull_tx_ts);
+
+          dwt_setrxtimeout(DISTANCE_RX_TIMEOUT_UUS);
+          dwt_setrxaftertxdelay(FINAL_TX_TO_DISTANCE_RX_DLY_UUS);
+          int err = sendtx(msg_final, MSG_FINAL_len, DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED, RANGING_ON);
+          if (err){
+            dwt_setrxtimeout(0);
+            dwt_rxenable(DWT_START_RX_IMMEDIATE);
+            state = STATE_Receive; // state mutate
+            return;
+          }
+          state = STATE_wait_DIST; // state mutate
           return;
       }
-      return; // <-- after switch(event) STATE_SS_TWR
+      break;
+
+    case STATE_wait_DIST:
+      if (event == EVENT_msg_DIST && src_addres == MSG_SRC_ID(rx_buffer)){ // тэг получил DISTANCE от того
+        MSG_DIST_dist_get(rx_buffer, &dist);
+        // float dist = uwb2meters(tof);
+        TRACE_MSG(rx_buffer);
+        DEBUG_transmit_fmt("dist: %f m", dist);
+
+        state = STATE_Receive; // state mutate
+        dwt_setrxtimeout(0);
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        return;
+      }
+      break;
+
+    case STATE_wait_FINAL:
+      if (event == EVENT_msg_FINAL && src_addres == MSG_SRC_ID(rx_buffer)){ // якорь получил FINAL от того
+        toIdle();
+
+        final_rx_ts = get_rx_ts();
+        MSG_FINAL_resp_rx_ts_get(rx_buffer,  &resp_rx_ts);
+        MSG_FINAL_final_tx_ts_get(rx_buffer, &final_tx_ts);
+        MSG_FINAL_pull_tx_ts_get(rx_buffer, &pull_tx_ts);
+
+        int64_t delay = (final_rx_ts + (FINAL_RX_TO_DISTANCE_TX_DLY_UUS * UUS_TO_DWT_TIME));
+        dwt_setdelayedtrxtime((uint32) (delay >> 8) );
+
+        uint64_t Tround1 = resp_rx_ts - pull_tx_ts;
+        uint64_t Treply1 = resp_tx_ts - pull_rx_ts;
+        uint64_t Treply2 = final_tx_ts - resp_rx_ts;
+        uint64_t Tround2 = final_rx_ts - resp_tx_ts;
+
+        double tof = (Tround1*Tround2 - Treply1*Treply2)
+            / (double)(final_tx_ts + final_rx_ts - pull_tx_ts - pull_rx_ts); //TODO: исп fixed-point
+        float dist = uwb2meters(tof);
+
+        MSG_SEQNUM(msg_dist)  = MSG_SEQNUM(rx_buffer);
+        MSG_PAN_ID(msg_dist)  = MY_PAN_ID;
+        MSG_DEST_ID(msg_dist) = src_addres;
+        MSG_SRC_ID(msg_dist)  = my_addr;
+        MSG_DIST_dist_set(msg_dist, &dist);
+
+        int err = sendtx(msg_dist, MSG_RESP_len, DWT_START_RX_DELAYED, RANGING_OFF);
+        if (err){
+          dwt_setrxtimeout(0);
+          dwt_rxenable(DWT_START_RX_IMMEDIATE);
+          return;
+        }
+        state = STATE_Receive; // state mutate
+        TRACE_MSG(msg_dist);
+        dwt_setrxtimeout(0);
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        return;
+      }
+      break;
 
     case STATE_Sniffer:
       if (EVENT_is(event, EVENTs_msg)){
-        trace_msg(rx_buffer);
-        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        // печатает всё что приходит и перед выводит rx_ts
+        // магия с перекрывающейся памятью
+        //                         5 байт RX_TS + смс
+        HAL_StatusTypeDef err = HAL_UART_Transmit(&huart1, rx_buffer_raw, rx_len + 5, 10);
+        if (err){
+          return;
+        }
       }else{
+        toIdleFromErr();
+
         state = STATE_Receive; // state mutate
         dwt_setsniffmode(0, 0, 0); // выключение сниффера
         dwt_enableframefilter(frame_filter); // врубаем фильтрацию обратно
+        dwt_setrxtimeout(0);
+        dwt_setdblrxbuffmode(0);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
       return;
 
-    default:
-      return;
+    case STATE_none:
+      break;
   }
+  DEBUG_transmit_fmt("%s/%s", showState(state), showEvent(event));
+  src_addres = 0xFFFF;
+  state = STATE_Receive;
+  dwt_setrxtimeout(0);
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  return;
 }
 
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ STATE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -460,7 +532,7 @@ int main(void)
   dwt_settxantennadelay(TX_ANT_DLY);
 
   dwt_reset_status(SYS_STATUS_SLP2INIT | SYS_STATUS_CPLOCK);
-  DEBUG_transmit_str("INITED");
+  // DEBUG_transmit_str("INITED");
 
 
   // set TX/RX leds
@@ -479,7 +551,7 @@ int main(void)
   }
 
   // PRINT WHO IS WHO
-  DEBUG_transmit_fmt("I am a %s", whoami);
+  // DEBUG_transmit_fmt("I'm % 6s", whoami);
 
   // Настройка PAN_ID и SHORT_ADDR
   // нужна для работы фильтра
@@ -490,13 +562,11 @@ int main(void)
   // dwt_enableframefilter(frame_filter); //! пока что что-то идет не так
   
   dwt_configeventcounters(1); // enalbe counters for diagnostics
-  
-  // enable IRQ
-  init_irq();
-  
-  uint32 cfg = dwt_read32bitreg(SYS_CFG_ID);
-  DEBUG_transmit_fmt("Sys_cfg = 0x%lX; Status = 0x%lX", cfg, dwt_get_status());
 
+  // enablt IRQ 
+  //                TX OK          RX OK         RX timeout          RX ERR
+  dwt_setcallbacks(NULL         , &handler_rxok, &handler_rxtimeout, &handler_rxfailed);
+  dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_IRQ_RXTIMEOUT | DWT_IRQ_RXFAILED, 1);
 
   // INITIAL STATE
   state = STATE_Receive;
@@ -516,18 +586,22 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
     MyEvents event = EVENT_none;
-    static MyEvents saved_event = EVENT_none;
+    #ifdef SNIFFER_FOR_DEBUG
+      static MyEvents saved_event = EVENT_initiate_sniffer;
+    #else
+      static MyEvents saved_event = EVENT_none;
+    #endif
 
     if (saved_event == EVENT_none && state <= STATE_Receive){
       #ifdef TAG
         static uint32 timer_pull_one = 0; 
         if (HAL_GetTick() - timer_pull_one > INITIATE_PULL_ONE_TIMEOUT_MS){
           timer_pull_one = HAL_GetTick();
-          event = EVENT_initiate_ss_twr;
+          event = EVENT_initiate_pull_3;
         }
       #endif
 
-      #ifdef DEBUG_DWT_DIAG
+      #if defined DEBUG_DWT_DIAG && !defined SNIFFER_FOR_DEBUG
         static uint32 timer_diag = 0;
         if (HAL_GetTick() - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
           timer_diag = HAL_GetTick();
@@ -539,19 +613,32 @@ int main(void)
     }
     
     // flag handlers and saved event
-    if (flag_pll_err){
-      saved_event = event;
-      event = EVENT_pll_error;
-      flag_pll_err = 0;
-    }else if(flag_rxfailed_status){
-      //TODO: Восстановаление  приема после ошибки
-      saved_event = event;
-      event = EVENT_rxfail;
-      flag_rxfailed_status = 0;
-    }else if(flag_rxok){
-      saved_event = event;
-      event = MSG_TYPE_2_EVENT(MSG_TYPE(rx_buffer));
+    if(flag_rxok){
       flag_rxok = 0;
+      if (cb_data_p->datalength <= MSG_MAX_LEN){
+        rx_len = cb_data_p->datalength;
+        *rx_ts_sniffer = get_rx_ts(); // надо rx_ts раньше писать, т.к. uint64_t перекрывает начало пакета
+        dwt_readrxdata(rx_buffer, rx_len, 0);
+      
+      #ifdef ANCHOR
+        led_signal((MSG_TYPE(rx_buffer)) & 7);
+      #endif
+
+        saved_event = event;
+        event = MSG_TYPE_2_EVENT(MSG_TYPE(rx_buffer));
+
+        if (state == STATE_Sniffer){
+          // некрасиво конечно, тут проверять это, а не step
+          // для двойного буфера
+          dwt_rxenable(DWT_START_RX_IMMEDIATE | DWT_NO_SYNC_PTRS);
+
+          uint8_t rxovrr = cb_data_p->status & SYS_STATUS_RXOVRR;
+          if (rxovrr){
+            Error_Handler();
+          }
+        }
+      }
+      //TODO: при ошибке, state остается неизменным и он беск ждёт
     }else if(flag_rxtimeout){
       saved_event = event;
       event = EVENT_rxtimeout;
@@ -566,20 +653,8 @@ int main(void)
     { // Aka server event
       // EVENT_rxtimeout processing in step
 
-      if (event == EVENT_pll_error){
-        if (flag_pll_err & SYS_STATUS_CLKPLL_LL){
-          DEBUG_transmit_fmt("!!! Clock PLL Losing Lock. №%u (common counter with RF_PLL_LL) !!!", pll_err_counter);
-        }
-        if (flag_pll_err & SYS_STATUS_RFPLL_LL){
-          DEBUG_transmit_fmt("!!! RF PLL Losing Lock. №%u (common counter with CPLL_LL) !!!", pll_err_counter);
-        }
-      }
-
-      if (event == EVENT_rxfail){ // сюда не относиться rx_timeout
-        dwt_rxenable(0); // re-enable RX
-        //? всегда ли надо re-enable ?
-        //TODO: отправка пакета об ошибке,
-        state = STATE_Receive;
+      if (event == EVENT_rxfail){
+        state = STATE_Receive; //? всегда ли
       }
     }
 
@@ -591,6 +666,7 @@ int main(void)
     if (EVENT_is(event, EVENTs_custom) || EVENT_is(event, EVENTs_msg) || (event == EVENT_rxtimeout)){
       step(event);
     }
+    __NOP();
   }
   /* USER CODE END 3 */
 }

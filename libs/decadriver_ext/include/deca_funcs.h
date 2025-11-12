@@ -8,6 +8,12 @@
 
 #include "messages.h"
 
+/* Speed of light in air, in metres per second. */
+#ifndef SPEED_OF_LIGHT
+#define SPEED_OF_LIGHT 299702547
+#endif
+
+float uwb2meters(double uwbTime);
 
 void dwt_custom_softReset();
 void softreset_receiver();

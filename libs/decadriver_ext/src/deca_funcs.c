@@ -2,6 +2,13 @@
 
 #include "deca_sleep.h"
 
+float uwb2meters(double uwbTime){
+    return (uwbTime) * SPEED_OF_LIGHT / (128 * 499.2 * 1000000);
+}
+
+fixed_5_32_t fixed2meters(fixed_5_32_t time){
+    return time / (128 * 499.2 * 1000000) * SPEED_OF_LIGHT;
+}
 
 dwt_irq_func_t _dwt_handler_cplock = NULL;
 dwt_irq_func_t _dwt_handler_esyncr = NULL;
@@ -54,11 +61,11 @@ int64_t get_sys_ts(){
 }
 
 int64_t get_rx_ts(){
-    return ((int64_t) dwt_readrxtimestamphi32() << 8) | (dwt_readrxtimestamplo32() & 0xff);
+    return (uint64_t)((int64_t) dwt_readrxtimestamphi32() << 8) | (dwt_readrxtimestamplo32() & 0xff);
 }
 
 int64_t get_tx_ts(){
-    return ((int64_t)dwt_readtxtimestamphi32() << 8) | (dwt_readtxtimestamplo32() & 0xff);
+    return (uint64_t)((int64_t)dwt_readtxtimestamphi32() << 8) | (dwt_readtxtimestamplo32() & 0xff);
 }
 
 uint32 dwt_get_status(){
