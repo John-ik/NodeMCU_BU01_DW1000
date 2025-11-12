@@ -10,7 +10,7 @@ Anchor ->(20) Tag: Response\n(pull_r, resp_t)
 note right: resp_t
 note left: resp_r
 
-Tag ->(20) Anchor: Final\n(resp_r, final_t)
+Tag ->(20) Anchor: Final\n(resp_r, final_t, pull_t)
 note left: final_t
 note right: final_r
 
