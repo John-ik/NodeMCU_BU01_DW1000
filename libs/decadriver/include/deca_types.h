@@ -10,6 +10,11 @@
  *
  */
 
+// Исп assert_param вместо assert
+#include "stm32_assert.h"
+#define assert(__e) assert_param(__e)
+
+
 #ifndef _DECA_TYPES_H_
 #define _DECA_TYPES_H_
 
@@ -68,5 +73,3 @@ typedef signed long int32;
 #endif
 
 #endif /* DECA_TYPES_H_ */
-
-

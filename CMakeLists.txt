@@ -43,6 +43,12 @@ increment_version()
 message(STATUS "Current compile_id: ${COMPILE_ID}")
 add_definitions(-DCOMPILE_ID=${COMPILE_ID})
 
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_definitions(-DDWT_API_ERROR_CHECK) # assert-ы в dwt функциях
+    # внутри либы я переопределил assert на assert_param
+    add_definitions(-DUSE_FULL_ASSERT) # assert_param
+endif()
+
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")

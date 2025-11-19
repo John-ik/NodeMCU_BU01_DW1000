@@ -28,6 +28,7 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Includes ------------------------------------------------------------------*/
+#include <stdint.h>
 /* Exported macro ------------------------------------------------------------*/
 #ifdef  USE_FULL_ASSERT
 /**
@@ -50,4 +51,3 @@ void assert_failed(uint8_t *file, uint32_t line);
 #endif
 
 #endif /* __STM32_ASSERT_H */
-

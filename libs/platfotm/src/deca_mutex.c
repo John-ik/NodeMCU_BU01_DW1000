@@ -50,7 +50,7 @@
  */
 decaIrqStatus_t decamutexon(void)           
 {
-	decaIrqStatus_t s = EXTI_GetITEnStatus(DW_EXTI_IRQ);
+	decaIrqStatus_t s = NVIC_GetEnableIRQ(DW_EXTI_IRQ);
 
 	if(s) {
 		NVIC_DisableIRQ(DW_EXTI_IRQ); //disable the external interrupt line

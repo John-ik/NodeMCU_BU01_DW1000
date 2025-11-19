@@ -18,11 +18,11 @@
 
 #ifdef TAG
   static char whoami[] = "TAG";
-  static uint16 my_addr = TAG_ID_marker | COMPILE_ID;
+  static uint16_t my_addr = TAG_ID_marker | COMPILE_ID;
 #endif
 #ifdef ANCHOR
   static char whoami[] = "ANCHOR";
-  static uint16 my_addr = ANCHOR_ID_marker | COMPILE_ID;
+  static uint16_t my_addr = ANCHOR_ID_marker | COMPILE_ID;
 #endif
 #ifdef TAG
   #ifdef ANCHOR
@@ -50,8 +50,8 @@ static dwt_config_t config =
     DWT_PRF_64M,     /* Pulse repetition frequency. */
     DWT_PLEN_128,   /* Preamble length. */
     DWT_PAC8,       /* Preamble acquisition chunk size. Used in RX only. */
-    4,               /* TX preamble code. Used in TX only. */
-    4,               /* RX preamble code. Used in RX only. */
+    10,               /* TX preamble code. Used in TX only. */
+    10,               /* RX preamble code. Used in RX only. */
     0,               /* Use non-standard SFD (Boolean) */
     DWT_BR_6M8,     /* Data rate. */
     DWT_PHRMODE_STD, /* PHY header mode. */

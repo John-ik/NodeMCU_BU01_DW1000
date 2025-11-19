@@ -517,6 +517,8 @@ int main(void)
   spi_full_speed();
   HAL_Delay(100);
 
+  assert_param(1 == 0);
+
   /* Configure DW1000. See NOTE 6 below. */
   dwt_configure(&config);
 
@@ -749,6 +751,18 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  static char temp[50+1+10+1+15+1]; // 30 букв + : + 2^32=10 цифр + : + строка + \0
+  snprintf(temp, sizeof temp, "%.30s:%lu: Assert failed\n", file, line);
+  Transmit(temp);
+
+  for(int i = 0; i < 3; i++){
+    led_signal(1 << 0); HAL_Delay(300);
+    led_signal(1 << 1); HAL_Delay(300);
+    led_signal(1 << 2); HAL_Delay(300);
+  }
+  led_signal(7); HAL_Delay(100);
+
+  Error_Handler();
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
