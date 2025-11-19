@@ -1,8 +1,8 @@
 #pragma once
 
 // Indexing TAGs and Anchor from 1. 0 is special
-// #define TAG
-#define ANCHOR
+#define TAG
+// #define ANCHOR
 
 // #define SNIFFER_FOR_DEBUG
 
@@ -87,7 +87,7 @@ static dwt_config_t config =
 
 #define DEFAULT_RX_TIMEOUT_UUS      300
 
-#define INITIATE_PULL_ONE_TIMEOUT_MS 1000
+#define INITIATE_PULL_ONE_PERIOD_MS 1000
 
 
 /// инициация со стороны тэга и теперь тэг ждет столько до начала RX чтобы поймать RESP

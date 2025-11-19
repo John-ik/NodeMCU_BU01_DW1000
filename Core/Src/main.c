@@ -89,6 +89,10 @@ static const dwt_cb_data_t *cb_data_p;
 
 static uint64_t *rx_ts_sniffer = (uint64_t*) &rx_buffer_raw[0]; // магия с пересечением памяти
 
+static uint16_t targets_len = 3;
+static uint16_t target_indx = 0;
+static uint16_t targets[3] = {ANCHOR_ID_marker | 54, ANCHOR_ID_marker | 55, 0xFFFF};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -210,7 +214,7 @@ typedef enum {
 } State;
 static State state = STATE_none;
 
-static uint16 frame_filter = 0; // DWT_FF_DATA_EN;
+static uint16 frame_filter = DWT_FF_DATA_EN | DWT_FF_BEACON_EN;
 
 char* showState(State state){
   switch (state)
@@ -249,7 +253,7 @@ void step(MsgEvent event){
 
           MSG_SEQNUM(msg_pull)  = ++frame_seq_nb;
           MSG_PAN_ID(msg_pull)  = MY_PAN_ID;
-          MSG_DEST_ID(msg_pull) = 0xFFFF;
+          MSG_DEST_ID(msg_pull) = targets[target_indx];
           MSG_SRC_ID(msg_pull)  = my_addr;
           MSG_TYPE(msg_pull)    = (uint8_t) event; // либо PULL либо PULL_3
 
@@ -559,7 +563,7 @@ int main(void)
   dwt_setaddress16(my_addr);
 
   // Confifure filtering
-  // dwt_enableframefilter(frame_filter); //! пока что что-то идет не так
+  dwt_enableframefilter(frame_filter); //! пока что что-то идет не так
   
   dwt_configeventcounters(1); // enalbe counters for diagnostics
 
@@ -593,18 +597,28 @@ int main(void)
     #endif
 
     if (saved_event == EVENT_none && state <= STATE_Receive){
+        uint32 cur_tick = HAL_GetTick();
+
       #ifdef TAG
         static uint32 timer_pull_one = 0; 
-        if (HAL_GetTick() - timer_pull_one > INITIATE_PULL_ONE_TIMEOUT_MS){
-          timer_pull_one = HAL_GetTick();
+        if (cur_tick - timer_pull_one > INITIATE_PULL_ONE_PERIOD_MS){
+          timer_pull_one = cur_tick;
           event = EVENT_initiate_pull_3;
+          target_indx = 0;
+        } else {
+          if (target_indx + 1 < targets_len){
+            target_indx++;
+            if (targets[target_indx] == 0xFFFF)
+              continue; // место для брейкпоинта, чтобы считать время всех измерений
+            event = EVENT_initiate_pull_3;
+          }
         }
       #endif
 
       #if defined DEBUG_DWT_DIAG && !defined SNIFFER_FOR_DEBUG
         static uint32 timer_diag = 0;
-        if (HAL_GetTick() - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
-          timer_diag = HAL_GetTick();
+        if (cur_tick - timer_diag > DEBUG_DWT_DIAG_TIMEOUT){
+          timer_diag = cur_tick;
           dwt_showDiag(uart_buf);
           Transmit(uart_buf);
           Transmit("\n");
