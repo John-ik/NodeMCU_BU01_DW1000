@@ -29,10 +29,10 @@ extern uint32 DEBUG_sys_ts;
 // +68 вырезает начало путей до файла
 // делает путь относительно папки проекта (зависит от папки)
 
-#define DEBUG_transmit_fmt(fmt, ...) do{                                                                                                         \
-    DEBUG_sys_ts = dwt_readsystimestamphi32();                                                                                                                 \
-    sprintf(DEBUG_uart_buf, "%s:%d:0x%08lX00: " fmt "\n", __FILE__, __LINE__, DEBUG_sys_ts, __VA_ARGS__); \
-    Transmit(DEBUG_uart_buf);                                                                                                                    \
+#define DEBUG_transmit_fmt(fmt, ...) do{                                                                                          \
+    DEBUG_sys_ts = dwt_readsystimestamphi32();                                                                                    \
+    snprintf(DEBUG_uart_buf, sizeof DEBUG_uart_buf, "%.50s:%d:0x%08lX00: " fmt "\n", __FILE__, __LINE__, DEBUG_sys_ts, __VA_ARGS__); \
+    Transmit(DEBUG_uart_buf);                                                                                                     \
   }while(0)
 
 #define DEBUG_transmit_str(str) DEBUG_transmit_fmt("%s", str)

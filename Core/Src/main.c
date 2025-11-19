@@ -69,9 +69,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-#define UART_BUF_len 512
-char uart_buf[UART_BUF_len]; 
-char DEBUG_uart_buf[630];
+#define UART_BUF_len 80
+char uart_buf[UART_BUF_len];
+char DEBUG_uart_buf[128];
 uint32 DEBUG_sys_ts;
 
 /* Frame sequence number, incremented after each transmission. */
@@ -517,8 +517,6 @@ int main(void)
   spi_full_speed();
   HAL_Delay(100);
 
-  assert_param(1 == 0);
-
   /* Configure DW1000. See NOTE 6 below. */
   dwt_configure(&config);
 
@@ -738,6 +736,12 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
+#ifdef DEBUG
+#define __assert_failed_buf DEBUG_uart_buf
+#else
+static char __assert_failed_buf[50+1+10+1+15+1];  ///< 50 букв + : + 2^32=10 цифр + : + строка + \0
+#endif
+
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
@@ -751,9 +755,8 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  static char temp[50+1+10+1+15+1]; // 30 букв + : + 2^32=10 цифр + : + строка + \0
-  snprintf(temp, sizeof temp, "%.30s:%lu: Assert failed\n", file, line);
-  Transmit(temp);
+  snprintf(__assert_failed_buf, sizeof __assert_failed_buf, "%.50s:%lu: Assert failed\n", file, line);
+  Transmit(__assert_failed_buf);
 
   for(int i = 0; i < 3; i++){
     led_signal(1 << 0); HAL_Delay(300);
