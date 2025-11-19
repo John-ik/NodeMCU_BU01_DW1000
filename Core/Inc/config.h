@@ -105,7 +105,7 @@ static dwt_config_t config =
 #define FINAL_RX_TIMEOUT_UUS            500
 
 /// тэг ждёт после FINAL чтобы начать RX для DISTANCE
-#define FINAL_TX_TO_DISTANCE_RX_DLY_UUS 2000uLL
+#define FINAL_TX_TO_DISTANCE_RX_DLY_UUS 1900uLL
 /// якорь моймал FINAL и отправит DISTANCE через
 #define FINAL_RX_TO_DISTANCE_TX_DLY_UUS 2100uLL
 /// тэг ждёт
